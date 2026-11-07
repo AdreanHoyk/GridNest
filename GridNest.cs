@@ -19,8 +19,8 @@ using System.Reflection;
 [assembly: AssemblyTitle("GridNest")]
 [assembly: AssemblyProduct("GridNest")]
 [assembly: AssemblyDescription("Desktop folder panels with a snap-to-grid layout")]
-[assembly: AssemblyVersion("0.9.0.0")]
-[assembly: AssemblyFileVersion("0.9.0.0")]
+[assembly: AssemblyVersion("0.9.1.0")]
+[assembly: AssemblyFileVersion("0.9.1.0")]
 
 namespace GridNest {
  public class Program {
@@ -339,8 +339,8 @@ namespace GridNest {
    bool dragging=false;Point start=new Point();double left=0,top=0;
    Func<Point> cursor=()=> {var pixel=PointToScreen(Mouse.GetPosition(this));var source=PresentationSource.FromVisual(this);return source!=null?source.CompositionTarget.TransformFromDevice.Transform(pixel):pixel;};
    surface.MouseLeftButtonDown+=(s,e)=> {if(backgroundOnly&&e.OriginalSource!=card&&e.OriginalSource!=icons)return;start=cursor();left=Left;top=Top;dragging=true;surface.CaptureMouse();e.Handled=true;};
-   surface.MouseMove+=(s,e)=> {if(!dragging||e.LeftButton!=MouseButtonState.Pressed)return;var now=cursor();Point point;if(Program.FindPlacement(this,left+now.X-start.X,top+now.Y-start.Y,Width,Height,false,out point)) {Left=point.X;Top=point.Y;}};
-   surface.MouseLeftButtonUp+=(s,e)=> {if(!dragging)return;dragging=false;surface.ReleaseMouseCapture();Save();e.Handled=true;};surface.LostMouseCapture+=(s,e)=>dragging=false;
+   surface.MouseMove+=(s,e)=> {if(!dragging||e.LeftButton!=MouseButtonState.Pressed)return;var now=cursor();var area=SystemParameters.WorkArea;Left=Math.Max(area.Left,Math.Min(area.Right-Width,left+now.X-start.X));Top=Math.Max(area.Top,Math.Min(area.Bottom-Height,top+now.Y-start.Y));};
+   surface.MouseLeftButtonUp+=(s,e)=> {if(!dragging)return;dragging=false;surface.ReleaseMouseCapture();Point point;if(Program.FindPlacement(this,Left,Top,Width,Height,true,out point)) {Left=point.X;Top=point.Y;}else {Left=left;Top=top;}Save();e.Handled=true;};surface.LostMouseCapture+=(s,e)=>dragging=false;
   }
   public void Save() {
    if(!loaded||retired)return;
