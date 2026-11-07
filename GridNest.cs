@@ -19,8 +19,8 @@ using System.Reflection;
 [assembly: AssemblyTitle("GridNest")]
 [assembly: AssemblyProduct("GridNest")]
 [assembly: AssemblyDescription("Desktop folder panels with a snap-to-grid layout")]
-[assembly: AssemblyVersion("0.10.0.0")]
-[assembly: AssemblyFileVersion("0.10.0.0")]
+[assembly: AssemblyVersion("0.11.0.0")]
+[assembly: AssemblyFileVersion("0.11.0.0")]
 
 namespace GridNest {
  public class Program {
@@ -281,7 +281,7 @@ namespace GridNest {
    using(var stream=typeof(Program).Assembly.GetManifestResourceStream("GridNest.AppIcon.ico")) { if(stream!=null)Icon=BitmapFrame.Create(stream,BitmapCreateOptions.PreservePixelFormat,BitmapCacheOption.OnLoad); }
    MinWidth=1; MinHeight=1; WindowStyle=WindowStyle.None; AllowsTransparency=true; Background=Brushes.Transparent;
    ShowInTaskbar=false; ResizeMode=ResizeMode.NoResize;
-   Load();
+   Load();LoadDefaultStyle();
    frame=new Grid(); frame.RowDefinitions.Add(new RowDefinition()); frame.RowDefinitions.Add(new RowDefinition { Height=new GridLength(38) }); Content=frame;
    card=new Border { CornerRadius=new CornerRadius(30), Padding=new Thickness(14), AllowDrop=true }; UpdateBackground();
    frame.Children.Add(card);
@@ -316,6 +316,9 @@ namespace GridNest {
    Add(menu,"Обновить значки",()=> { cache.Clear(); Refresh(); }); menu.Items.Add(new Separator());
    Add(menu,"Размер и оформление…",Settings);
    Add(menu,"Цвет подложки…",ColorSettings);
+   Add(menu,"Применить оформление к другим…",()=>ShareStyle());
+   Add(menu,"Скопировать оформление",()=>copiedStyle=CurrentStyle());
+   Add(menu,"Вставить оформление…",()=>ShareStyle(true));
    Add(menu,"Настройки приложения…",Program.AppSettings);
    var motion=new MenuItem { Header="Анимации значков и панелей", IsCheckable=true, IsChecked=animations };
    animationMenu=motion;
@@ -611,6 +614,134 @@ namespace GridNest {
   }
   void UpdateBackground() { if(card!=null)card.Background=new SolidColorBrush(Color.FromArgb((byte)(alpha*255),background.R,background.G,background.B));double luma=.2126*background.R+.7152*background.G+.0722*background.B;Resources["PanelHandle"]=new SolidColorBrush(luma>150?Color.FromRgb(39,87,97):Color.FromRgb(167,214,213)); }
   sealed class DialogOwner : Forms.IWin32Window { public IntPtr Handle { get; private set; } public DialogOwner(Window w) { Handle=new WindowInteropHelper(w).Handle; } }
+  sealed class FolderStyle {
+   public Color Background;
+   public double Opacity;
+   public bool DarkText, Labels, Animations;
+   public int IconSize, Columns, Rows;
+   public XElement ToXml() {
+    return new XElement("Style",new XAttribute("Background",ColorHex(Background)),
+     new XAttribute("Opacity",Opacity),new XAttribute("DarkText",DarkText),
+     new XAttribute("Labels",Labels),new XAttribute("Animations",Animations),
+     new XAttribute("IconSize",IconSize),new XAttribute("Columns",Columns),new XAttribute("Rows",Rows));
+   }
+   public static FolderStyle Read(XElement x) {
+    return new FolderStyle { Background=ParseColor((string)x.Attribute("Background")),
+     Opacity=Math.Max(.15,Math.Min(1,(double)x.Attribute("Opacity"))),
+     DarkText=(bool)x.Attribute("DarkText"),Labels=(bool)x.Attribute("Labels"),
+     Animations=(bool)x.Attribute("Animations"),
+     IconSize=Math.Max(28,Math.Min(128,(int)x.Attribute("IconSize"))),
+     Columns=Math.Max(1,Math.Min(20,(int)x.Attribute("Columns"))),
+     Rows=Math.Max(1,Math.Min(20,(int)x.Attribute("Rows"))) };
+   }
+  }
+  static FolderStyle copiedStyle;
+  FolderStyle CurrentStyle() {
+   return new FolderStyle { Background=background,Opacity=alpha,DarkText=darkCaption,
+    Labels=labels,Animations=animations,IconSize=iconSize,Columns=columns,Rows=rows };
+  }
+  void RedrawStyle() {
+   UpdateBackground();PaintLabel();animationMenu.IsChecked=animations;
+   cache.Clear();Refresh();Save();
+  }
+  void RestoreStyle(FolderStyle style,Point position) {
+   background=style.Background;alpha=style.Opacity;darkCaption=style.DarkText;
+   labels=style.Labels;animations=style.Animations;iconSize=style.IconSize;
+   columns=style.Columns;rows=style.Rows;Left=position.X;Top=position.Y;
+   snapping=true;
+   try { Width=50+columns*CellWidth;Height=78+rows*CellHeight;icons.Width=columns*CellWidth; }
+   finally { snapping=false; }
+   RedrawStyle();
+  }
+  bool ReceiveStyle(FolderStyle style,bool appearance,bool items,bool dimensions) {
+   var previous=CurrentStyle();var position=new Point(Left,Top);
+   if(items) {labels=style.Labels;iconSize=style.IconSize;}
+   if(items||dimensions) {
+    int c=dimensions?style.Columns:columns,r=dimensions?style.Rows:rows;
+    if(!SetGrid(c,r,false)||columns!=c||rows!=r) {
+     RestoreStyle(previous,position);return false;
+    }
+   }
+   if(appearance) {background=style.Background;alpha=style.Opacity;darkCaption=style.DarkText;}
+   if(items)animations=style.Animations;
+   RedrawStyle();return true;
+  }
+  void LoadDefaultStyle() {
+   if(File.Exists(config))return;
+   try {
+    var style=FolderStyle.Read(XElement.Load(Path.Combine(Program.Home,"default-style.xml")));
+    background=style.Background;alpha=style.Opacity;darkCaption=style.DarkText;
+    labels=style.Labels;animations=style.Animations;iconSize=style.IconSize;
+    columns=style.Columns;rows=style.Rows;
+   } catch(Exception ex) { Debug.WriteLine(ex.Message); }
+  }
+  void ShareStyle(bool paste=false) {
+   if(paste&&copiedStyle==null) {MessageBox.Show("Сначала скопируйте оформление папки.");return;}
+   var source=paste?copiedStyle:CurrentStyle();
+   var w=new Window {Title=paste?"Вставить оформление — GridNest":"Применить к другим папкам — GridNest",
+    Width=460,Height=620,MinHeight=450,Owner=this,ShowInTaskbar=false,
+    WindowStartupLocation=WindowStartupLocation.CenterOwner};
+   var content=new StackPanel {Margin=new Thickness(24)};
+   w.Content=new ScrollViewer {Content=content,VerticalScrollBarVisibility=ScrollBarVisibility.Auto};
+   var checks=new Dictionary<PanelWindow,CheckBox>();
+   if(!paste) {
+    var all=new CheckBox {Content="Выбрать все",Margin=new Thickness(0,0,0,8)};
+    content.Children.Add(all);
+    var targets=new StackPanel();
+    content.Children.Add(new ScrollViewer {Content=targets,MaxHeight=200,VerticalScrollBarVisibility=ScrollBarVisibility.Auto});
+    foreach(var panel in Program.Panels.Where(panel=>panel!=this&&!panel.retired)) {
+     var check=new CheckBox {Content=panel.FolderName};checks.Add(panel,check);targets.Children.Add(check);
+    }
+    all.Checked+=(s,e)=> {foreach(var check in checks.Values)check.IsChecked=true;};
+    all.Unchecked+=(s,e)=> {foreach(var check in checks.Values)check.IsChecked=false;};
+   } else checks.Add(this,new CheckBox {IsChecked=true});
+   var appearance=new CheckBox {Content="Цвет, прозрачность и цвет названия",IsChecked=true,Margin=new Thickness(0,16,0,4)};
+   var items=new CheckBox {Content="Масштаб значков, подписи и анимации"};
+   var dimensions=new CheckBox {Content="Число столбцов и рядов"};
+   var defaults=new CheckBox {Content="Использовать выбранные параметры для новых папок",Margin=new Thickness(0,12,0,8)};
+   content.Children.Add(appearance);content.Children.Add(items);content.Children.Add(dimensions);content.Children.Add(defaults);
+   var summary=new TextBlock {TextWrapping=TextWrapping.Wrap,Margin=new Thickness(0,12,0,0)};
+   content.Children.Add(summary);
+   Action updateSummary=()=>summary.Text="Выбрано папок: "+checks.Count(pair=>pair.Value.IsChecked==true);
+   foreach(var check in checks.Values) {
+    check.Checked+=(s,e)=>updateSummary();check.Unchecked+=(s,e)=>updateSummary();
+   }
+   updateSummary();
+   var apply=new Button {Content="Применить",Margin=new Thickness(0,16,0,0)};content.Children.Add(apply);
+   apply.Click+=(s,e)=> {
+    var selected=checks.Where(pair=>pair.Value.IsChecked==true).Select(pair=>pair.Key).ToList();
+    if(!selected.Any()&&defaults.IsChecked!=true) {MessageBox.Show(w,"Выберите папки.");return;}
+    if(appearance.IsChecked!=true&&items.IsChecked!=true&&dimensions.IsChecked!=true) {MessageBox.Show(w,"Выберите параметры.");return;}
+    var snapshots=selected.ToDictionary(panel=>panel,panel=>panel.CurrentStyle());
+    var positions=selected.ToDictionary(panel=>panel,panel=>new Point(panel.Left,panel.Top));
+    var failed=new List<PanelWindow>();
+    foreach(var panel in selected)
+     if(!panel.ReceiveStyle(source,appearance.IsChecked==true,items.IsChecked==true,dimensions.IsChecked==true))failed.Add(panel);
+    if(failed.Count>0) {
+     if(MessageBox.Show(w,"Не хватает места или папки закреплены\n"+string.Join(", ",failed.Select(panel=>panel.FolderName))+
+      "\nПрименить к этим папкам только цвет, прозрачность и цвет названия?","Оформление",
+      MessageBoxButton.YesNo,MessageBoxImage.Question)==MessageBoxResult.Yes)
+      foreach(var panel in failed)panel.ReceiveStyle(source,true,false,false);
+    }
+    string defaultPath=Path.Combine(Program.Home,"default-style.xml");
+    string oldDefault=File.Exists(defaultPath)?File.ReadAllText(defaultPath):null;
+    if(defaults.IsChecked==true) {
+     var initial=new FolderStyle {Background=Color.FromRgb(44,46,55),Opacity=.84,IconSize=64,Columns=3,Rows=3,Animations=true};
+     if(oldDefault!=null) {try {initial=FolderStyle.Read(XElement.Parse(oldDefault));}catch{}}
+     if(appearance.IsChecked==true) {initial.Background=source.Background;initial.Opacity=source.Opacity;initial.DarkText=source.DarkText;}
+     if(items.IsChecked==true) {initial.IconSize=source.IconSize;initial.Labels=source.Labels;initial.Animations=source.Animations;}
+     if(dimensions.IsChecked==true) {initial.Columns=source.Columns;initial.Rows=source.Rows;}
+     try {initial.ToXml().Save(defaultPath);}catch(Exception ex) {MessageBox.Show(w,ex.Message,"Не удалось сохранить стиль");}
+    }
+    Program.Remember(()=> {
+     foreach(var panel in selected)if(!panel.retired)panel.RestoreStyle(snapshots[panel],positions[panel]);
+     if(defaults.IsChecked==true) {if(oldDefault==null) {if(File.Exists(defaultPath))File.Delete(defaultPath);}else File.WriteAllText(defaultPath,oldDefault);}
+    });
+    w.Close();
+   };
+   w.ShowDialog();
+  }
+
   void ColorSettings() {
    var w=new Window { Title="Цвет подложки — "+name, Width=420, Height=400, ResizeMode=ResizeMode.NoResize, Owner=this, WindowStartupLocation=WindowStartupLocation.CenterOwner, ShowInTaskbar=false };
    var stack=new StackPanel { Margin=new Thickness(20) }; w.Content=stack;
@@ -647,7 +778,9 @@ namespace GridNest {
    var labelColor=new CheckBox { Content="Тёмный текст названия папки",IsChecked=darkCaption };sp.Children.Add(labelColor);
    var color=new Button { Content="Цвет подложки…", Margin=new Thickness(0,12,0,0) }; color.Click+=(s,e)=>ColorSettings(); sp.Children.Add(color);
    var button=new Button { Content="Сохранить настройки", Background=new SolidColorBrush(Color.FromRgb(50,112,112)), Foreground=Brushes.White, Margin=new Thickness(0,18,0,0) }; sp.Children.Add(button);
-   button.Click+=(s,e)=> { int a,b; if(!int.TryParse(width.Text,out a)||a<1||a>20||!int.TryParse(height.Text,out b)||b<1||b>20) { MessageBox.Show(w,"Число столбцов и рядов должно быть от 1 до 20."); return; }var previousLayout=CaptureLayout();bool layoutChange=a!=columns||b!=rows||(int)Math.Round(size.Value*56/100)!=iconSize;int oldSize=iconSize;iconSize=Math.Max(28,Math.Min(128,(int)Math.Round(size.Value*56/100)));if(!SetGrid(a,b)) {iconSize=oldSize;MessageBox.Show(w,"Недостаточно свободного места с учётом расстояния между папками. Уменьшите размер или переместите соседние панели.");return;} darkCaption=labelColor.IsChecked==true;PaintLabel();storeFiles=files.IsChecked==true; animations=motion.IsChecked==true; animationMenu.IsChecked=animations;alpha=opacity.Value/100;UpdateBackground();Clamp();AlignPosition();cache.Clear();Refresh();Save();if(layoutChange)Program.Remember(previousLayout);w.Close();};w.ShowDialog();
+   button.Click+=(s,e)=> { int a,b; if(!int.TryParse(width.Text,out a)||a<1||a>20||!int.TryParse(height.Text,out b)||b<1||b>20) { MessageBox.Show(w,"Число столбцов и рядов должно быть от 1 до 20."); return; }var previousLayout=CaptureLayout();bool layoutChange=a!=columns||b!=rows||(int)Math.Round(size.Value*56/100)!=iconSize;int oldSize=iconSize;iconSize=Math.Max(28,Math.Min(128,(int)Math.Round(size.Value*56/100)));if(!SetGrid(a,b)) {iconSize=oldSize;MessageBox.Show(w,"Недостаточно свободного места с учётом расстояния между папками. Уменьшите размер или переместите соседние панели.");return;} darkCaption=labelColor.IsChecked==true;PaintLabel();storeFiles=files.IsChecked==true; animations=motion.IsChecked==true; animationMenu.IsChecked=animations;alpha=opacity.Value/100;UpdateBackground();Clamp();AlignPosition();cache.Clear();Refresh();Save();if(layoutChange)Program.Remember(previousLayout);w.Close();};
+   var share=new Button {Content="Применить к другим папкам…",Margin=new Thickness(0,8,0,0)};sp.Children.Add(share);
+   share.Click+=(s,e)=> {button.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));if(!w.IsVisible)ShareStyle();};w.ShowDialog();
   }
   static TextBox Field(StackPanel p,string title,string value) { p.Children.Add(new TextBlock { Text=title, Margin=new Thickness(0,0,0,3) }); var t=new TextBox { Text=value, Margin=new Thickness(0,0,0,10) }; p.Children.Add(t); return t; }
   public string Diagnostics() { return name+" | folder="+folder+" | entries="+Directory.GetFileSystemEntries(folder).Length+" | visibleCells="+icons.Children.Count+" | size="+ActualWidth+"x"+ActualHeight+" | icons="+cache.Count+" | resolved="+cache.Values.Count(v=>v!=null); }
