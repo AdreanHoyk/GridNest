@@ -18,13 +18,18 @@ jobs:
       - name: Package
         shell: powershell
         run: Compress-Archive -Path GridNest.exe,app.ico,Install.ps1,README.txt,LICENSE.txt -DestinationPath GridNest.zip
+      - name: Build EXE installer
+        shell: powershell
+        run: ./Build-Setup.ps1
       - uses: actions/upload-artifact@v4
         with:
           name: GridNest-Windows
-          path: GridNest.zip
+          path: |
+            GridNest.zip
+            GridNest-Setup.exe
       - name: Publish tagged release
         if: startsWith(github.ref, 'refs/tags/v')
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create '${{ github.ref_name }}' GridNest.zip --generate-notes --title 'GridNest ${{ github.ref_name }}'
+        run: gh release create '${{ github.ref_name }}' GridNest.zip GridNest-Setup.exe --generate-notes --title 'GridNest ${{ github.ref_name }}'

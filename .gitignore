@@ -1,6 +1,8 @@
 GridNest.exe
+GridNest-Setup.exe
 *.zip
 !docs/downloads/GridNest.zip
+!docs/downloads/GridNest-Setup.exe
 *.log
 *.lnk
 *.url
