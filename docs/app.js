@@ -1,0 +1,6 @@
+const card=document.querySelector('#demo-card');
+const label=document.querySelector('#hex-label');
+function paint(color){card.style.backgroundColor=color;label.textContent=color.toUpperCase();document.querySelectorAll('.swatch').forEach(button=>{const active=button.dataset.color.toLowerCase()===color.toLowerCase();button.classList.toggle('active',active);button.setAttribute('aria-pressed',String(active));});}
+document.querySelectorAll('.swatch').forEach(button=>button.addEventListener('click',()=>{paint(button.dataset.color);document.querySelector('#custom-color').value=button.dataset.color;}));
+document.querySelector('#custom-color').addEventListener('input',event=>paint(event.target.value));
+document.querySelector('#copy').addEventListener('click',async()=>{const button=document.querySelector('#copy');const text='powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\\Install.ps1';try{await navigator.clipboard.writeText(text);button.textContent='Скопировано';document.querySelector('#status').textContent='Команда скопирована';setTimeout(()=>button.textContent='Копировать',1800);}catch{button.textContent='Выделите команду';document.querySelector('#status').textContent='Скопируйте команду вручную';}});

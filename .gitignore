@@ -1,0 +1,12 @@
+GridNest.exe
+*.zip
+!docs/downloads/GridNest.zip
+*.log
+*.lnk
+*.url
+.app/
+.archive/
+.backup*/
+work/
+Thumbs.db
+Desktop.ini
