@@ -19,8 +19,8 @@ using System.Reflection;
 [assembly: AssemblyTitle("GridNest")]
 [assembly: AssemblyProduct("GridNest")]
 [assembly: AssemblyDescription("Desktop folder panels with a snap-to-grid layout")]
-[assembly: AssemblyVersion("0.12.0.0")]
-[assembly: AssemblyFileVersion("0.12.0.0")]
+[assembly: AssemblyVersion("0.12.1.0")]
+[assembly: AssemblyFileVersion("0.12.1.0")]
 
 namespace GridNest {
  public class Program {
@@ -354,7 +354,7 @@ namespace GridNest {
   }
   static void Add(ContextMenu m,string text,Action action) { var item=new MenuItem { Header=text }; item.Click+=(s,e)=>action(); m.Items.Add(item); }
   void Load() {
-   try { var x=XElement.Load(config); Width=Get(x,"Width",Width); Height=Get(x,"Height",Height); Left=Get(x,"Left",Left); Top=Get(x,"Top",Top); iconSize=(int)Math.Max(28,Math.Min(128,Get(x,"IconSize",64))); alpha=Math.Max(.15,Math.Min(1,Get(x,"Opacity",.84))); darkCaption=(bool?)x.Attribute("DarkCaption")??false; labels=(string)x.Attribute("Labels")=="true"; Topmost=(string)x.Attribute("Topmost")=="true"; columns=(int)Get(x,"Columns",Math.Round((Width-50)/CellWidth)); rows=(int)Get(x,"Rows",Math.Round((Height-66)/CellHeight)); } catch {}
+   try { var x=XElement.Load(config); Width=Get(x,"Width",Width); Height=Get(x,"Height",Height); Left=Get(x,"Left",Left); Top=Get(x,"Top",Top); iconSize=(int)Math.Max(28,Math.Min(128,Get(x,"IconSize",64))); alpha=Math.Max(0,Math.Min(1,Get(x,"Opacity",.84))); darkCaption=(bool?)x.Attribute("DarkCaption")??false; labels=(string)x.Attribute("Labels")=="true"; Topmost=(string)x.Attribute("Topmost")=="true"; columns=(int)Get(x,"Columns",Math.Round((Width-50)/CellWidth)); rows=(int)Get(x,"Rows",Math.Round((Height-66)/CellHeight)); } catch {}
    try {var x=XElement.Load(config);iconTheme=ValidIconTheme((string)x.Attribute("IconTheme"));}catch{}
    try { var x=XElement.Load(config); if(x.Attribute("Background")!=null)background=ParseColor((string)x.Attribute("Background")); } catch {}
    try { animations=(string)XElement.Load(config).Attribute("Animations")!="false"; } catch {}
@@ -433,7 +433,7 @@ namespace GridNest {
   }
   public void Save() {
    if(!loaded||retired)return;
-   try { new XElement("Panel",new XAttribute("Mode",storeFiles?"Files":"Shortcuts"),new XAttribute("Columns",columns),new XAttribute("Rows",rows),new XAttribute("Width",Width),new XAttribute("Height",Height),new XAttribute("Left",Left),new XAttribute("Top",Top),new XAttribute("IconTheme",iconTheme),new XAttribute("IconSize",iconSize),new XAttribute("Opacity",alpha),new XAttribute("Background",ColorHex(background)),new XAttribute("Animations",animations?"true":"false"),new XAttribute("DarkCaption",darkCaption),new XAttribute("Labels",labels?"true":"false"),new XAttribute("Topmost",Topmost?"true":"false")).Save(config); } catch {}
+   try { new XElement("Panel",new XAttribute("Mode",storeFiles?"Files":"Shortcuts"),new XAttribute("Columns",columns),new XAttribute("Rows",rows),new XAttribute("Width",Width),new XAttribute("Height",Height),new XAttribute("Left",Left),new XAttribute("Top",Top),new XAttribute("IconTheme",iconTheme),new XAttribute("IconSize",iconSize),new XAttribute("Opacity",backdropPreview?committedAlpha:alpha),new XAttribute("Background",ColorHex(backdropPreview?committedBackground:background)),new XAttribute("Animations",animations?"true":"false"),new XAttribute("DarkCaption",darkCaption),new XAttribute("Labels",labels?"true":"false"),new XAttribute("Topmost",Topmost?"true":"false")).Save(config); } catch {}
   }
   bool Motion { get { return animations&&SystemParameters.ClientAreaAnimation; } }
   void Fade(UIElement target,double opacity,int ms) {
@@ -712,7 +712,7 @@ namespace GridNest {
    }
    public static FolderStyle Read(XElement x) {
     return new FolderStyle { Background=ParseColor((string)x.Attribute("Background")),IconTheme=ValidIconTheme((string)x.Attribute("IconTheme")),
-     Opacity=Math.Max(.15,Math.Min(1,(double)x.Attribute("Opacity"))),
+     Opacity=Math.Max(0,Math.Min(1,(double)x.Attribute("Opacity"))),
      DarkText=(bool)x.Attribute("DarkText"),Labels=(bool)x.Attribute("Labels"),
      Animations=(bool)x.Attribute("Animations"),
      IconSize=Math.Max(28,Math.Min(128,(int)x.Attribute("IconSize"))),
@@ -738,18 +738,20 @@ namespace GridNest {
    finally { snapping=false; }
    RedrawStyle();
   }
-  bool ReceiveStyle(FolderStyle style,bool appearance,bool items,bool dimensions) {
+  bool ReceiveStyle(FolderStyle style,bool appearance,bool items,bool dimensions,bool? transparency=null) {
+   bool layoutFits=true;
    var previous=CurrentStyle();var position=new Point(Left,Top);
    if(items) {labels=style.Labels;iconSize=style.IconSize;}
    if(items||dimensions) {
     int c=dimensions?style.Columns:columns,r=dimensions?style.Rows:rows;
     if(!SetGrid(c,r,false)||columns!=c||rows!=r) {
-     RestoreStyle(previous,position);return false;
+     RestoreStyle(previous,position);layoutFits=false;
     }
    }
-   if(appearance) {background=style.Background;alpha=style.Opacity;darkCaption=style.DarkText;iconTheme=style.IconTheme;}
+   if(transparency??appearance)alpha=style.Opacity;
+   if(appearance) {background=style.Background;darkCaption=style.DarkText;iconTheme=style.IconTheme;}
    if(items)animations=style.Animations;
-   RedrawStyle();return true;
+   RedrawStyle();return layoutFits;
   }
   void LoadDefaultStyle() {
    if(File.Exists(config))return;
@@ -780,11 +782,12 @@ namespace GridNest {
     all.Checked+=(s,e)=> {foreach(var check in checks.Values)check.IsChecked=true;};
     all.Unchecked+=(s,e)=> {foreach(var check in checks.Values)check.IsChecked=false;};
    } else checks.Add(this,new CheckBox {IsChecked=true});
-   var appearance=new CheckBox {Content="Стиль значков, цвет, прозрачность и название",IsChecked=true,Margin=new Thickness(0,16,0,4)};
+   var appearance=new CheckBox {Content="Стиль значков, цвет и название",IsChecked=true,Margin=new Thickness(0,16,0,4)};
+   var transparency=new CheckBox {Content="Прозрачность подложки",IsChecked=true};
    var items=new CheckBox {Content="Масштаб значков, подписи и анимации"};
    var dimensions=new CheckBox {Content="Число столбцов и рядов"};
    var defaults=new CheckBox {Content="Использовать выбранные параметры для новых папок",Margin=new Thickness(0,12,0,8)};
-   content.Children.Add(appearance);content.Children.Add(items);content.Children.Add(dimensions);content.Children.Add(defaults);
+   content.Children.Add(appearance);content.Children.Add(transparency);content.Children.Add(items);content.Children.Add(dimensions);content.Children.Add(defaults);
    var summary=new TextBlock {TextWrapping=TextWrapping.Wrap,Margin=new Thickness(0,12,0,0)};
    content.Children.Add(summary);
    Action updateSummary=()=>summary.Text="Выбрано папок: "+checks.Count(pair=>pair.Value.IsChecked==true);
@@ -796,24 +799,20 @@ namespace GridNest {
    apply.Click+=(s,e)=> {
     var selected=checks.Where(pair=>pair.Value.IsChecked==true).Select(pair=>pair.Key).ToList();
     if(!selected.Any()&&defaults.IsChecked!=true) {MessageBox.Show(w,"Выберите папки.");return;}
-    if(appearance.IsChecked!=true&&items.IsChecked!=true&&dimensions.IsChecked!=true) {MessageBox.Show(w,"Выберите параметры.");return;}
+    if(appearance.IsChecked!=true&&transparency.IsChecked!=true&&items.IsChecked!=true&&dimensions.IsChecked!=true) {MessageBox.Show(w,"Выберите параметры.");return;}
     var snapshots=selected.ToDictionary(panel=>panel,panel=>panel.CurrentStyle());
     var positions=selected.ToDictionary(panel=>panel,panel=>new Point(panel.Left,panel.Top));
     var failed=new List<PanelWindow>();
     foreach(var panel in selected)
-     if(!panel.ReceiveStyle(source,appearance.IsChecked==true,items.IsChecked==true,dimensions.IsChecked==true))failed.Add(panel);
-    if(failed.Count>0) {
-     if(MessageBox.Show(w,"Не хватает места или папки закреплены\n"+string.Join(", ",failed.Select(panel=>panel.FolderName))+
-      "\nПрименить к этим папкам только цвет, прозрачность и цвет названия?","Оформление",
-      MessageBoxButton.YesNo,MessageBoxImage.Question)==MessageBoxResult.Yes)
-      foreach(var panel in failed)panel.ReceiveStyle(source,true,false,false);
-    }
+     if(!panel.ReceiveStyle(source,appearance.IsChecked==true,items.IsChecked==true,dimensions.IsChecked==true,transparency.IsChecked==true))failed.Add(panel);
+    if(failed.Count>0)MessageBox.Show(w,"Размер или масштаб не применён к папкам\n"+string.Join(", ",failed.Select(panel=>panel.FolderName))+"\nВыбранные цвета и прозрачность применены.","Недостаточно места или папки закреплены");
     string defaultPath=Path.Combine(Program.Home,"default-style.xml");
     string oldDefault=File.Exists(defaultPath)?File.ReadAllText(defaultPath):null;
     if(defaults.IsChecked==true) {
      var initial=new FolderStyle {Background=Color.FromRgb(44,46,55),Opacity=.84,IconSize=64,Columns=3,Rows=3,Animations=true};
      if(oldDefault!=null) {try {initial=FolderStyle.Read(XElement.Parse(oldDefault));}catch{}}
-     if(appearance.IsChecked==true) {initial.IconTheme=source.IconTheme;initial.Background=source.Background;initial.Opacity=source.Opacity;initial.DarkText=source.DarkText;}
+     if(appearance.IsChecked==true) {initial.IconTheme=source.IconTheme;initial.Background=source.Background;initial.DarkText=source.DarkText;}
+     if(transparency.IsChecked==true)initial.Opacity=source.Opacity;
      if(items.IsChecked==true) {initial.IconSize=source.IconSize;initial.Labels=source.Labels;initial.Animations=source.Animations;}
      if(dimensions.IsChecked==true) {initial.Columns=source.Columns;initial.Rows=source.Rows;}
      try {initial.ToXml().Save(defaultPath);}catch(Exception ex) {MessageBox.Show(w,ex.Message,"Не удалось сохранить стиль");}
@@ -827,25 +826,70 @@ namespace GridNest {
    w.ShowDialog();
   }
 
-  void ColorSettings() {
-   var w=new Window { Title="Цвет подложки — "+name, Width=420, Height=400, ResizeMode=ResizeMode.NoResize, Owner=this, WindowStartupLocation=WindowStartupLocation.CenterOwner, ShowInTaskbar=false };
-   var stack=new StackPanel { Margin=new Thickness(20) }; w.Content=stack;
-   stack.Children.Add(new TextBlock { Text="Цвет для папки «"+name+"»", FontSize=16, Margin=new Thickness(0,0,0,14) });
-   var swatches=new WrapPanel { Margin=new Thickness(0,0,0,14) }; stack.Children.Add(swatches);
-   var input=new TextBox { Text=ColorHex(background), FontSize=16, Margin=new Thickness(0,0,0,10) };
-   foreach(var hex in new[]{"#2C2E37","#24425C","#254B43","#473657","#5B3A3A","#57462B","#172634","#526079"}) {
-    var button=new Button { Background=new SolidColorBrush(ParseColor(hex)), Width=32, Height=32, Margin=new Thickness(0,0,7,0), ToolTip=hex }; System.Windows.Automation.AutomationProperties.SetName(button,"Цвет "+hex); button.Click+=(s,e)=>input.Text=hex; swatches.Children.Add(button);
-   }
-   stack.Children.Add(new TextBlock { Text="HEX-код (#RRGGBB)", Margin=new Thickness(0,0,0,5) }); stack.Children.Add(input);
-   var preview=new Border { Height=42, CornerRadius=new CornerRadius(10), Background=new SolidColorBrush(background), Margin=new Thickness(0,0,0,12) }; stack.Children.Add(preview);
-   input.TextChanged+=(s,e)=> { try { preview.Background=new SolidColorBrush(ParseColor(input.Text)); } catch(FormatException) {} };
-   var choose=new Button { Content="Палитра Windows…", Padding=new Thickness(8,5,8,5), Margin=new Thickness(0,0,0,10) }; stack.Children.Add(choose);
-   choose.Click+=(s,e)=> { using(var dialog=new Forms.ColorDialog { FullOpen=true }) { Color c=background; try { c=ParseColor(input.Text); } catch(FormatException) {} dialog.Color=System.Drawing.Color.FromArgb(c.R,c.G,c.B); if(dialog.ShowDialog(new DialogOwner(w))==Forms.DialogResult.OK)input.Text=ColorHex(Color.FromRgb(dialog.Color.R,dialog.Color.G,dialog.Color.B)); } };
-   var apply=new Button { Content="Применить", IsDefault=true, Padding=new Thickness(8,6,8,6) }; stack.Children.Add(apply);
-   apply.Click+=(s,e)=> { try { background=ParseColor(input.Text); UpdateBackground(); Save(); w.Close(); } catch(FormatException ex) { MessageBox.Show(w,ex.Message,"Цвет подложки"); } }; w.ShowDialog();
+  bool backdropPreview;
+  bool backdropColorValid=true;
+  Color committedBackground;
+  double committedAlpha;
+  void BeginBackdropPreview() {
+   committedBackground=background;committedAlpha=alpha;backdropPreview=true;backdropColorValid=true;
   }
+  void EndBackdropPreview(bool accepted) {
+   if(!accepted) {background=committedBackground;alpha=committedAlpha;}
+   backdropPreview=false;UpdateBackground();
+  }
+  void PlaceEditor(Window editor) {
+   editor.WindowStartupLocation=WindowStartupLocation.Manual;
+   var area=Program.Area(Left,Top);
+   editor.Left=Left+Width+12;
+   if(editor.Left+editor.Width>area.Right)editor.Left=Left-editor.Width-12;
+   editor.Left=Math.Max(area.Left,Math.Min(area.Right-editor.Width,editor.Left));
+   editor.Top=Math.Max(area.Top,Math.Min(area.Bottom-editor.Height,Top));
+  }
+  void BackdropEditor(StackPanel parent) {
+   parent.Children.Add(new TextBlock {Text="Цвет подложки",Margin=new Thickness(0,12,0,4)});
+   var input=new TextBox {Text=ColorHex(background),ToolTip="Цвет в формате #RRGGBB"};
+   parent.Children.Add(input);
+   var swatches=new WrapPanel {Margin=new Thickness(0,8,0,8)};parent.Children.Add(swatches);
+   foreach(var hex in new[]{"#2C2E37","#24425C","#254B43","#473657","#B8E1E4","#F0D9EB"}) {
+    var button=new Button {Background=new SolidColorBrush(ParseColor(hex)),Width=32,Height=28,Margin=new Thickness(0,0,6,0),ToolTip=hex};
+    button.Click+=(s,e)=>input.Text=hex;swatches.Children.Add(button);
+   }
+   var error=new TextBlock {Text="Введите #RRGGBB",Foreground=Brushes.Salmon,Visibility=Visibility.Collapsed};
+   parent.Children.Add(error);
+   input.TextChanged+=(s,e)=> {
+    try {background=ParseColor(input.Text);UpdateBackground();error.Visibility=Visibility.Collapsed;backdropColorValid=true;}
+    catch(FormatException) {error.Visibility=Visibility.Visible;backdropColorValid=false;}
+   };
+   var label=new TextBlock();parent.Children.Add(label);
+   var opacity=new Slider {Minimum=0,Maximum=100,Value=(1-alpha)*100,ToolTip="Прозрачность подложки"};
+   parent.Children.Add(opacity);
+   Action update=()=> {alpha=1-opacity.Value/100;label.Text="Прозрачность подложки · "+Math.Round(opacity.Value)+"%";UpdateBackground();};
+   opacity.ValueChanged+=(s,e)=>update();update();
+   var choose=new Button {Content="Палитра Windows…",Margin=new Thickness(0,4,0,8)};parent.Children.Add(choose);
+   choose.Click+=(s,e)=> {
+    using(var dialog=new Forms.ColorDialog {FullOpen=true,Color=System.Drawing.Color.FromArgb(background.R,background.G,background.B)}) {
+     if(dialog.ShowDialog(new DialogOwner(Window.GetWindow(parent)))==Forms.DialogResult.OK)
+      input.Text=ColorHex(Color.FromRgb(dialog.Color.R,dialog.Color.G,dialog.Color.B));
+    }
+   };
+  }
+  void ColorSettings() {
+   BeginBackdropPreview();bool accepted=false;
+   var w=new Window {Title="Цвет и прозрачность — "+name,Width=420,Height=430,Owner=this,ShowInTaskbar=false,ResizeMode=ResizeMode.NoResize};
+   PlaceEditor(w);
+   var content=new StackPanel {Margin=new Thickness(24)};w.Content=content;
+   BackdropEditor(content);
+   var save=new Button {Content="Сохранить",IsDefault=true};content.Children.Add(save);
+   var cancel=new Button {Content="Отмена",IsCancel=true,Margin=new Thickness(0,8,0,0)};content.Children.Add(cancel);
+   save.Click+=(s,e)=> {if(!backdropColorValid)return;accepted=true;w.Close();};
+   w.Closed+=(s,e)=> {EndBackdropPreview(accepted);if(accepted)Save();};
+   w.ShowDialog();
+  }
+
   void Settings() {
+   BeginBackdropPreview();bool accepted=false;
    var w=new Window { Title="Настройки папки — GridNest", Width=460, Height=Math.Min(760,SystemParameters.WorkArea.Height-40), MinHeight=400, ResizeMode=ResizeMode.CanResize, WindowStartupLocation=WindowStartupLocation.CenterScreen, Owner=this, ShowInTaskbar=false };
+   PlaceEditor(w);w.Closed+=(s,e)=>EndBackdropPreview(accepted);
    StackPanel sp=new StackPanel { Margin=new Thickness(28) }; w.Content=new ScrollViewer { Content=sp, VerticalScrollBarVisibility=ScrollBarVisibility.Auto, HorizontalScrollBarVisibility=ScrollBarVisibility.Disabled };
    sp.Children.Add(new TextBlock { Text=name, FontSize=26, FontWeight=FontWeights.SemiBold, Margin=new Thickness(0,0,0,4) });
    var subtitle=new TextBlock { Text="Пространство для ваших файлов и приложений", FontSize=12, Margin=new Thickness(0,0,0,20), TextWrapping=TextWrapping.Wrap };subtitle.SetResourceReference(TextBlock.ForegroundProperty,"UiMuted");sp.Children.Add(subtitle);
@@ -854,17 +898,16 @@ namespace GridNest {
    var scaleLabel=new TextBlock { Margin=new Thickness(0,8,0,0) }; sp.Children.Add(scaleLabel);
    var size=new Slider { Minimum=50, Maximum=230, TickFrequency=5, IsSnapToTickEnabled=true, Value=iconSize/56.0*100, ToolTip="Масштаб значков" }; sp.Children.Add(size);
    Action scaleText=()=>scaleLabel.Text="МАСШТАБ · "+Math.Round(size.Value)+"% / "+Math.Min(128,Math.Round(size.Value*56/100))+" px"; size.ValueChanged+=(s,e)=>scaleText(); scaleText();
-   var opacityLabel=new TextBlock(); sp.Children.Add(opacityLabel);
-   var opacity=new Slider { Minimum=15, Maximum=100, Value=alpha*100, ToolTip="Непрозрачность" }; sp.Children.Add(opacity);
-   Action opacityText=()=>opacityLabel.Text="НЕПРОЗРАЧНОСТЬ · "+Math.Round(opacity.Value)+"%"; opacity.ValueChanged+=(s,e)=>opacityText(); opacityText();
+   BackdropEditor(sp);
    var section=new TextBlock { Text="СОДЕРЖИМОЕ ПАПКИ", FontSize=11, Margin=new Thickness(0,10,0,0) };section.SetResourceReference(TextBlock.ForegroundProperty,"UiAccent");sp.Children.Add(section);
    var files=new RadioButton { Content="Файлы — перемещать оригиналы", IsChecked=storeFiles, GroupName="SettingsMode" }; sp.Children.Add(files);
    sp.Children.Add(new RadioButton { Content="Ярлыки — создавать ссылки", IsChecked=!storeFiles, GroupName="SettingsMode" });
    var motion=new CheckBox { Content="Анимации значков и панелей", IsChecked=animations }; sp.Children.Add(motion);
    var labelColor=new CheckBox { Content="Тёмный текст названия папки",IsChecked=darkCaption };sp.Children.Add(labelColor);
-   var color=new Button { Content="Цвет подложки…", Margin=new Thickness(0,12,0,0) }; color.Click+=(s,e)=>ColorSettings(); sp.Children.Add(color);
+
    var button=new Button { Content="Сохранить настройки", Background=new SolidColorBrush(Color.FromRgb(50,112,112)), Foreground=Brushes.White, Margin=new Thickness(0,18,0,0) }; sp.Children.Add(button);
-   button.Click+=(s,e)=> { int a,b; if(!int.TryParse(width.Text,out a)||a<1||a>20||!int.TryParse(height.Text,out b)||b<1||b>20) { MessageBox.Show(w,"Число столбцов и рядов должно быть от 1 до 20."); return; }var previousLayout=CaptureLayout();bool layoutChange=a!=columns||b!=rows||(int)Math.Round(size.Value*56/100)!=iconSize;int oldSize=iconSize;iconSize=Math.Max(28,Math.Min(128,(int)Math.Round(size.Value*56/100)));if(!SetGrid(a,b)) {iconSize=oldSize;MessageBox.Show(w,"Недостаточно свободного места с учётом расстояния между папками. Уменьшите размер или переместите соседние панели.");return;} iconTheme=chosenTheme;darkCaption=labelColor.IsChecked==true;PaintLabel();storeFiles=files.IsChecked==true; animations=motion.IsChecked==true; animationMenu.IsChecked=animations;alpha=opacity.Value/100;UpdateBackground();Clamp();AlignPosition();cache.Clear();Refresh();Save();if(layoutChange)Program.Remember(previousLayout);w.Close();};
+   button.Click+=(s,e)=> { if(!backdropColorValid)return;int a,b; if(!int.TryParse(width.Text,out a)||a<1||a>20||!int.TryParse(height.Text,out b)||b<1||b>20) { MessageBox.Show(w,"Число столбцов и рядов должно быть от 1 до 20."); return; }var previousLayout=CaptureLayout();bool layoutChange=a!=columns||b!=rows||(int)Math.Round(size.Value*56/100)!=iconSize;int oldSize=iconSize;iconSize=Math.Max(28,Math.Min(128,(int)Math.Round(size.Value*56/100)));if(!SetGrid(a,b)) {iconSize=oldSize;MessageBox.Show(w,"Недостаточно свободного места с учётом расстояния между папками. Уменьшите размер или переместите соседние панели.");return;} iconTheme=chosenTheme;darkCaption=labelColor.IsChecked==true;PaintLabel();storeFiles=files.IsChecked==true; animations=motion.IsChecked==true; animationMenu.IsChecked=animations;accepted=true;EndBackdropPreview(true);UpdateBackground();Clamp();AlignPosition();cache.Clear();Refresh();Save();if(layoutChange)Program.Remember(previousLayout);w.Close();};
+   var cancel=new Button {Content="Отмена",IsCancel=true,Margin=new Thickness(0,8,0,0)};sp.Children.Add(cancel);
    var share=new Button {Content="Применить к другим папкам…",Margin=new Thickness(0,8,0,0)};sp.Children.Add(share);
    share.Click+=(s,e)=> {button.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));if(!w.IsVisible)ShareStyle();};w.ShowDialog();
   }
