@@ -1,4 +1,4 @@
-GridNest 0.7.0 — папки и файлы на рабочем столе
+GridNest 0.7.1 — папки и файлы на рабочем столе
 
 УСТАНОВКА
 Распакуйте ZIP целиком. В PowerShell из распакованной папки:
@@ -65,3 +65,4 @@ Escape закрывает поиск. Ищется имя значка и/или
 Исходники и инструкция: https://github.com/AdreanHoyk/GridNest
 Страница: https://adreanhoyk.github.io/GridNest/
 Лицензия MIT, см. LICENSE.txt.
+
