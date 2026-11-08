@@ -19,8 +19,8 @@ using System.Reflection;
 [assembly: AssemblyTitle("GridNest")]
 [assembly: AssemblyProduct("GridNest")]
 [assembly: AssemblyDescription("Desktop folder panels with a snap-to-grid layout")]
-[assembly: AssemblyVersion("0.14.0.0")]
-[assembly: AssemblyFileVersion("0.14.0.0")]
+[assembly: AssemblyVersion("0.15.0.0")]
+[assembly: AssemblyFileVersion("0.15.0.0")]
 
 namespace GridNest {
  public sealed class SettingsLayout {
@@ -37,7 +37,7 @@ namespace GridNest {
    grid.RowDefinitions.Add(new RowDefinition());
    grid.RowDefinitions.Add(new RowDefinition {Height=GridLength.Auto});
    Body=new StackPanel {Margin=new Thickness(22,20,22,8)};
-   var scroll=new ScrollViewer {Name="SettingsScroll",Content=Body,VerticalScrollBarVisibility=ScrollBarVisibility.Auto,HorizontalScrollBarVisibility=ScrollBarVisibility.Disabled};
+   var scroll=new ScrollViewer {Name="SettingsScroll",Content=Body,VerticalScrollBarVisibility=ScrollBarVisibility.Auto,HorizontalScrollBarVisibility=ScrollBarVisibility.Disabled,PanningMode=PanningMode.VerticalOnly};
    grid.Children.Add(scroll);contentScroll=scroll;
    Actions=new StackPanel {Margin=new Thickness(22,14,22,16)};
    var footer=new Border {BorderThickness=new Thickness(0,1,0,0),Child=Actions};
@@ -51,7 +51,7 @@ namespace GridNest {
     root.Children.Remove(contentScroll);root.Children.Insert(0,pages);
    }
    var content=new StackPanel {Margin=new Thickness(0,14,8,8)};
-   var scroll=new ScrollViewer {Name="SettingsScroll",Content=content,VerticalScrollBarVisibility=ScrollBarVisibility.Auto,HorizontalScrollBarVisibility=ScrollBarVisibility.Disabled};
+   var scroll=new ScrollViewer {Name="SettingsScroll",Content=content,VerticalScrollBarVisibility=ScrollBarVisibility.Auto,HorizontalScrollBarVisibility=ScrollBarVisibility.Disabled,PanningMode=PanningMode.VerticalOnly};
    pages.Items.Add(new TabItem {Header=title,Content=scroll});
    return content;
   }
@@ -78,6 +78,130 @@ namespace GridNest {
   public static void Hint(StackPanel parent,string text) {
    var hint=new TextBlock {Text=text,TextWrapping=TextWrapping.Wrap,FontSize=12,Margin=new Thickness(0,4,0,8)};
    hint.SetResourceReference(TextBlock.ForegroundProperty,"UiMuted");parent.Children.Add(hint);
+  }
+ }
+
+ public static class AppUpdater {
+  const string Releases="https://github.com/AdreanHoyk/GridNest/releases";
+  const string LatestApi="https://api.github.com/repos/AdreanHoyk/GridNest/releases/latest";
+  public static string InstalledVersion {get{return typeof(Program).Assembly.GetName().Version.ToString(3);}}
+  [System.Runtime.Serialization.DataContract]
+  public sealed class ReleaseInfo {
+   [System.Runtime.Serialization.DataMember(Name="tag_name")]public string Tag;
+   [System.Runtime.Serialization.DataMember(Name="body")]public string Notes;
+   [System.Runtime.Serialization.DataMember(Name="draft")]public bool Draft;
+   [System.Runtime.Serialization.DataMember(Name="prerelease")]public bool Prerelease;
+   [System.Runtime.Serialization.DataMember(Name="assets")]public ReleaseAsset[] Assets;
+   public Version Version;
+  }
+  [System.Runtime.Serialization.DataContract]
+  public sealed class ReleaseAsset {
+   [System.Runtime.Serialization.DataMember(Name="name")]public string Name;
+   [System.Runtime.Serialization.DataMember(Name="browser_download_url")]public string Url;
+   [System.Runtime.Serialization.DataMember(Name="digest")]public string Digest;
+   [System.Runtime.Serialization.DataMember(Name="size")]public long Size;
+  }
+  public static ReleaseInfo ParseRelease(string json) {
+   var serializer=new System.Runtime.Serialization.Json.DataContractJsonSerializer(typeof(ReleaseInfo));
+   ReleaseInfo release;
+   using(var stream=new MemoryStream(System.Text.Encoding.UTF8.GetBytes(json)))release=(ReleaseInfo)serializer.ReadObject(stream);
+   if(release==null||release.Draft||release.Prerelease||
+    !System.Text.RegularExpressions.Regex.IsMatch(release.Tag??"","^v?[0-9]+[.][0-9]+[.][0-9]+$")||
+    !Version.TryParse(release.Tag.TrimStart('v'),out release.Version))
+    throw new InvalidDataException("Не удалось определить версию обновления.");
+   return release;
+  }
+  public static ReleaseAsset Installer(ReleaseInfo release) {
+   return (release.Assets??new ReleaseAsset[0]).FirstOrDefault(asset=>
+    asset.Name=="GridNest-Setup.exe"&&asset.Size>0&&
+    asset.Url==Releases+"/download/"+Uri.EscapeDataString(release.Tag)+"/GridNest-Setup.exe"&&
+    System.Text.RegularExpressions.Regex.IsMatch(asset.Digest??"","^sha256:[0-9a-fA-F]{64}$"));
+  }
+  public static void VerifyInstaller(string path,ReleaseAsset asset) {
+   if(new FileInfo(path).Length!=asset.Size)throw new InvalidDataException("Файл загрузился не полностью. Повторите обновление.");
+   string hash;
+   using(var algorithm=System.Security.Cryptography.SHA256.Create())
+   using(var stream=File.OpenRead(path))hash=BitConverter.ToString(algorithm.ComputeHash(stream)).Replace("-","");
+   if(!hash.Equals(asset.Digest.Substring(7),StringComparison.OrdinalIgnoreCase))
+    throw new InvalidDataException("Контрольная сумма не совпала. Повторите обновление.");
+  }
+  static string PlainNotes(string value) {
+   string text=System.Text.RegularExpressions.Regex.Replace(value??"","(?m)^#{1,6} *","");
+   return text.Replace("**","").Replace(((char)96).ToString(),"");
+  }
+  public static void Show(Window owner=null) {
+   if(owner==null)owner=Program.Panels.FirstOrDefault(panel=>panel.IsActive)??Program.Panels.FirstOrDefault(panel=>panel.IsVisible);
+   var w=new Window {Title="Обновление GridNest",Width=520,Height=560,Owner=owner,ShowInTaskbar=false,
+    WindowStartupLocation=owner==null?WindowStartupLocation.CenterScreen:WindowStartupLocation.CenterOwner};
+   var layout=new SettingsLayout(w);
+   var status=new TextBlock {Name="UpdateStatus",Text="Проверяю обновления…",TextWrapping=TextWrapping.Wrap,FontSize=18,Margin=new Thickness(0,0,0,12)};
+   layout.Body.Children.Add(status);
+   SettingsLayout.Hint(layout.Body,"Установлена версия "+InstalledVersion);
+   var notes=new TextBlock {TextWrapping=TextWrapping.Wrap,Margin=new Thickness(0,12,0,16)};
+   layout.Body.Children.Add(notes);
+   var releasePage=new Button {Content="Открыть релизы на GitHub ↗",HorizontalAlignment=HorizontalAlignment.Left};
+   layout.Body.Children.Add(releasePage);
+   releasePage.Click+=(s,e)=>PanelWindow.OpenPath(Releases);
+   var check=new Button {Name="CheckUpdates",Content="Проверить ещё раз",Margin=new Thickness(0,0,0,12)};
+   layout.Actions.Children.Add(check);
+   var install=new Button {Name="InstallUpdate",Content="Скачать и обновить",IsEnabled=false};
+   SettingsLayout.Buttons(layout.Actions,w,install);
+   bool closed=false,busy=false;
+   ReleaseAsset asset=null;
+   var client=new System.Net.WebClient();
+   client.Encoding=System.Text.Encoding.UTF8;client.Headers["User-Agent"]="GridNest/"+InstalledVersion;
+   System.Net.ServicePointManager.SecurityProtocol|=System.Net.SecurityProtocolType.Tls12;
+   Func<System.Threading.Tasks.Task> refresh=async ()=> {
+    if(busy||closed)return;
+    busy=true;check.IsEnabled=false;install.IsEnabled=false;asset=null;notes.Text="";
+    status.Text="Проверяю обновления…";
+    try {
+     client.Headers["Accept"]="application/vnd.github+json";
+     string json=await client.DownloadStringTaskAsync(new Uri(LatestApi));
+     if(closed)return;
+     var release=ParseRelease(json);
+     int comparison=release.Version.CompareTo(new Version(InstalledVersion));
+     if(comparison<=0) {
+      status.Text=comparison==0?"Установлена актуальная версия":"Установленная версия новее опубликованной";
+      notes.Text="Последний релиз на GitHub — "+release.Version.ToString(3);return;
+     }
+     status.Text="Доступна версия "+release.Version.ToString(3);
+     notes.Text=PlainNotes(release.Notes);
+     asset=Installer(release);
+     install.IsEnabled=asset!=null;
+     if(asset==null)status.Text+=". Установщик с контрольной суммой пока недоступен.";
+    } catch(Exception ex) {
+     Debug.WriteLine(ex);
+     if(!closed)status.Text="Не удалось проверить обновления. Проверьте подключение и повторите попытку.";
+    } finally {busy=false;if(!closed)check.IsEnabled=true;}
+   };
+   client.DownloadProgressChanged+=(s,e)=> {if(!closed&&asset!=null&&busy)status.Text="Скачиваю обновление · "+e.ProgressPercentage+"%";};
+   check.Click+=async (s,e)=>await refresh();
+   w.Loaded+=async (s,e)=>await refresh();
+   install.Click+=async (s,e)=> {
+    if(asset==null||busy)return;
+    busy=true;check.IsEnabled=false;install.IsEnabled=false;
+    string directory=Path.Combine(Path.GetTempPath(),"GridNest-update-"+Guid.NewGuid().ToString("N"));
+    string file=Path.Combine(directory,"GridNest-Setup.exe");
+    bool launched=false;
+    try {
+     Directory.CreateDirectory(directory);client.Headers["Accept"]="application/octet-stream";
+     status.Text="Скачиваю обновление…";
+     await client.DownloadFileTaskAsync(new Uri(asset.Url),file);
+     if(closed)return;
+     status.Text="Проверяю файл…";VerifyInstaller(file,asset);
+     Process.Start(new ProcessStartInfo(file) {UseShellExecute=true});
+     launched=true;w.Close();
+    } catch(Exception ex) {
+     Debug.WriteLine(ex);
+     if(!closed)status.Text=ex is InvalidDataException?ex.Message:"Не удалось скачать или открыть установщик. Повторите попытку или откройте релиз на GitHub.";
+    } finally {
+     if(!launched)try {if(File.Exists(file))File.Delete(file);if(Directory.Exists(directory))Directory.Delete(directory);}catch(Exception ex) {Debug.WriteLine(ex.Message);}
+     busy=false;if(!closed) {check.IsEnabled=true;install.IsEnabled=asset!=null;}
+    }
+   };
+   w.Closed+=(s,e)=> {closed=true;client.CancelAsync();client.Dispose();};
+   w.ShowDialog();
   }
  }
 
@@ -130,8 +254,8 @@ namespace GridNest {
    showWait=System.Threading.ThreadPool.RegisterWaitForSingleObject(showEvent,(s,t)=>app.Dispatcher.BeginInvoke(new Action(ShowPanels)),null,-1,false);
    stopEvent=new System.Threading.EventWaitHandle(false,System.Threading.EventResetMode.AutoReset,"Local\\GridNestStop");stopWait=System.Threading.ThreadPool.RegisterWaitForSingleObject(stopEvent,(s,t)=>app.Dispatcher.BeginInvoke(new Action(()=>app.Shutdown())),null,-1,false);
    string[] preferred={"Работа","AI","Сеть","Разработка","3D и CAD","Медиа","Игры","VR","Браузеры","Система"};
-   string[] names=preferred.Where(n=>Directory.Exists(Path.Combine(Data,n))).Concat(Directory.GetDirectories(Data).Select(Path.GetFileName).Where(n=>!n.StartsWith(".")&&!preferred.Contains(n))).ToArray();
-   if(names.Length==0&&!File.Exists(Path.Combine(Home,"initialized")))names=new[]{"Работа","AI","Сеть"};
+   string[] names=Directory.GetDirectories(Data).Select(Path.GetFileName).Where(n=>!n.StartsWith(".")).OrderBy(n=> {int index=Array.FindIndex(preferred,p=>p.Equals(n,StringComparison.OrdinalIgnoreCase));return index<0?preferred.Length:index;}).ThenBy(n=>n,StringComparer.CurrentCultureIgnoreCase).ToArray();
+   if(names.Length==0&&!File.Exists(Path.Combine(Home,"initialized")))names=new[]{"игры"};
    for(int i=0;i<names.Length;i++) { PanelWindow p=new PanelWindow(names[i],i); Panels.Add(p); p.Show(); }
    app.Dispatcher.BeginInvoke(DispatcherPriority.ContextIdle,new Action(()=> {LayoutReady=true;foreach(var p in Panels) {Point point;if(FindPlacement(p,p.Left,p.Top,p.Width,p.Height,true,out point)) {p.Left=point.X;p.Top=point.Y;p.Save();}}}));
    if(!File.Exists(Path.Combine(Home,"initialized")))File.WriteAllText(Path.Combine(Home,"initialized"),"1");
@@ -158,7 +282,7 @@ namespace GridNest {
    menu.Items.Add(pin);add("Отменить последнее действие",Undo);
    var folders=new Forms.ToolStripMenuItem("Папки");
    folders.DropDownOpening+=(s,e)=> { folders.DropDownItems.Clear(); foreach(var p in Panels) { var entry=new Forms.ToolStripMenuItem(p.FolderName) { Checked=p.IsVisible }; entry.Click+=(x,y)=>Application.Current.Dispatcher.BeginInvoke(new Action(()=> { if(p.IsVisible)p.Hide();else { p.Show();p.Activate(); } })); folders.DropDownItems.Add(entry); } PaintTrayItems(folders.DropDownItems); }; menu.Items.Add(folders);
-   add("Настройки приложения…",AppSettings);
+   add("Настройки приложения…",AppSettings);add("Проверить обновления…",()=>AppUpdater.Show());
    add("Открыть архив папок",OpenArchive);
    menu.Items.Add(new Forms.ToolStripSeparator()); add("Выход",()=>Application.Current.Shutdown());
    tray.ContextMenuStrip=menu; PaintTray(); tray.DoubleClick+=(s,e)=>Application.Current.Dispatcher.BeginInvoke(new Action(ShowPanels)); tray.Visible=true;
@@ -207,6 +331,7 @@ namespace GridNest {
    placement.Children.Add(spacing);
    var locked=new CheckBox {Content="Закрепить положение и размер папок",IsChecked=Locked,Margin=new Thickness(0,12,0,0)};
    placement.Children.Add(locked);
+   var updates=new Button {Content="Проверить обновления… · "+AppUpdater.InstalledVersion,HorizontalAlignment=HorizontalAlignment.Left,Margin=new Thickness(0,6,0,0)};layout.Body.Children.Add(updates);updates.Click+=(s,e)=>AppUpdater.Show(w);
    var apply=new Button {Name="SaveApplicationSettings",Content="Применить"};
    SettingsLayout.Buttons(layout.Actions,w,apply);
    apply.Click+=(s,e)=> {
@@ -378,7 +503,7 @@ namespace GridNest {
    // An explicit resize handle works with transparent borderless windows.
    System.Windows.Controls.Primitives.Thumb grip=new System.Windows.Controls.Primitives.Thumb { Width=30, Height=12, HorizontalAlignment=HorizontalAlignment.Right, VerticalAlignment=VerticalAlignment.Bottom, Margin=new Thickness(0,0,2,2), Cursor=Cursors.SizeNWSE, Opacity=.65, ToolTip="Изменить размер папки" };
    grip.SetResourceReference(Control.ForegroundProperty,"PanelHandle");
-   resizeHandle=grip;  grip.Template=GripTemplate(); content.Children.Add(grip);
+   resizeHandle=grip;AttachTouchResize(grip);  grip.Template=GripTemplate(); content.Children.Add(grip);
    var moveDots=new Canvas {Width=12,Height=10,HorizontalAlignment=HorizontalAlignment.Center,VerticalAlignment=VerticalAlignment.Center};
    for(int y=0;y<3;y++)for(int x=0;x<2;x++) {var dot=new System.Windows.Shapes.Ellipse {Width=2,Height=2};dot.SetResourceReference(System.Windows.Shapes.Shape.FillProperty,"PanelHandle");Canvas.SetLeft(dot,3+x*4);Canvas.SetTop(dot,1+y*3);moveDots.Children.Add(dot);}
    var moveHandle=new Border {Child=moveDots,Width=48,Height=12,Background=Brushes.Transparent,HorizontalAlignment=HorizontalAlignment.Center,VerticalAlignment=VerticalAlignment.Bottom,Margin=new Thickness(0,0,0,2),Cursor=Cursors.SizeAll,ToolTip="Перетащить папку"};
@@ -492,6 +617,7 @@ namespace GridNest {
    };
   }
   void AttachDrag(UIElement surface,bool backgroundOnly=false) {
+   if(!backgroundOnly)AttachTouchPanelMove(surface);
    bool dragging=false;Point start=new Point();double left=0,top=0;
    Func<Point> cursor=()=> {var pixel=PointToScreen(Mouse.GetPosition(this));var source=PresentationSource.FromVisual(this);return source!=null?source.CompositionTarget.TransformFromDevice.Transform(pixel):pixel;};
    System.Windows.Controls.Primitives.Popup preview=null;
@@ -502,7 +628,7 @@ namespace GridNest {
     if(surface.IsMouseCaptured)surface.ReleaseMouseCapture();
    };
    surface.MouseLeftButtonDown+=(s,e)=> {
-    if(Program.Locked || (backgroundOnly&&e.OriginalSource!=card&&e.OriginalSource!=icons))return;
+    if(TouchMouse(e)||Program.Locked || (backgroundOnly&&e.OriginalSource!=card&&e.OriginalSource!=icons))return;
     Activate();Focus();start=cursor();left=Left;top=Top;restore=CaptureLayout();
     destination=new Point(left,top);dragging=surface.CaptureMouse();e.Handled=dragging;
    };
@@ -585,23 +711,218 @@ namespace GridNest {
     RenderOptions.SetBitmapScalingMode(image,BitmapScalingMode.HighQuality); cell.Children.Add(IconTile(image,iconTheme,slot,iconSize));
     if(labels) cell.Children.Add(new TextBlock { Text=IsShortcut(path)?Path.GetFileNameWithoutExtension(path):Path.GetFileName(path), FontSize=11, Foreground=Brushes.White, TextAlignment=TextAlignment.Center, TextTrimming=TextTrimming.CharacterEllipsis, Height=16,LineHeight=16,Margin=new Thickness(0,0,0,8) });
     Point start=new Point(); bool pressed=false,dragged=false;
-    cell.PreviewMouseLeftButtonDown+=(s,e)=> { start=e.GetPosition(this); pressed=true; dragged=false; cell.Focus(); cell.CaptureMouse(); IconMotion(scale,lift,.94,1); e.Handled=true; };
+    cell.PreviewMouseLeftButtonDown+=(s,e)=> { if(TouchMouse(e))return;start=e.GetPosition(this); pressed=true; dragged=false; cell.Focus(); cell.CaptureMouse(); IconMotion(scale,lift,.94,1); e.Handled=true; };
     cell.MouseMove+=(s,e)=> {
      if(!pressed||e.LeftButton!=MouseButtonState.Pressed)return;
      Point now=e.GetPosition(this);
      if(Math.Abs(now.X-start.X)<SystemParameters.MinimumHorizontalDragDistance&&Math.Abs(now.Y-start.Y)<SystemParameters.MinimumVerticalDragDistance)return;
      pressed=false; dragged=true; cell.ReleaseMouseCapture(); IconMotion(scale,lift,1,0);
-     var data=new DataObject(DataFormats.FileDrop,new[]{path}); data.SetData(InternalDrag,path);
-     try { DragDrop.DoDragDrop(cell,data,DragDropEffects.Move|DragDropEffects.Copy); } finally { foreach(var p in Program.Panels) { p.cache.Clear(); p.Refresh(); } }
+     DragItem(cell,path);
      e.Handled=true;
     };
-    cell.MouseLeftButtonUp+=(s,e)=> { bool click=pressed&&!dragged; pressed=false; cell.ReleaseMouseCapture(); IconMotion(scale,lift,cell.IsMouseOver?1.08:1,cell.IsMouseOver?-1:0); if(click)Open(path); e.Handled=true; };
+    cell.MouseLeftButtonUp+=(s,e)=> { if(TouchMouse(e))return;bool click=pressed&&!dragged; pressed=false; cell.ReleaseMouseCapture(); IconMotion(scale,lift,cell.IsMouseOver?1.08:1,cell.IsMouseOver?-1:0); if(click)Open(path); e.Handled=true; };
     cell.LostMouseCapture+=(s,e)=> { pressed=false; IconMotion(scale,lift,1,0); };
     cell.KeyDown+=(s,e)=> { if(e.Key==Key.F2) { RenameItem(path); e.Handled=true; } };
-    var menu=new ContextMenu(); Add(menu,"Открыть",()=>Open(path)); Add(menu,"Переименовать… (F2)",()=>RenameItem(path)); Add(menu,"Показать в папке",()=>Process.Start("explorer.exe","/select,\""+path+"\"")); cell.ContextMenu=menu;
+    var menu=new ContextMenu(); Add(menu,"Открыть",()=>Open(path)); Add(menu,"Переименовать… (F2)",()=>RenameItem(path)); Add(menu,"Показать в папке",()=>Process.Start("explorer.exe","/select,\""+path+"\"")); cell.ContextMenu=menu;AttachTouchItem(cell,path);
     icons.Children.Add(cell);
    }
   }
+  [StructLayout(LayoutKind.Sequential)]
+  struct CursorPoint {public int X,Y;}
+  [DllImport("user32.dll")]static extern bool GetCursorPos(out CursorPoint point);
+  sealed class DragIconPreview : IDisposable {
+   readonly PanelWindow owner;
+   readonly Point hotspot;
+   readonly DispatcherTimer timer;
+   Window window;
+   public DragIconPreview(PanelWindow panel,FrameworkElement tile,Point? touchHotspot=null,Point? touchScreen=null) {
+    owner=panel;
+    double width=Math.Max(1,tile.ActualWidth),height=Math.Max(1,tile.ActualHeight);
+    var point=touchHotspot??Mouse.GetPosition(tile);
+    hotspot=new Point(Math.Max(0,Math.Min(width,point.X)),Math.Max(0,Math.Min(height,point.Y)));
+    var drawing=new DrawingVisual();
+    using(var context=drawing.RenderOpen())
+     context.DrawRectangle(new VisualBrush(tile),null,new Rect(0,0,width,height));
+    var bitmap=new RenderTargetBitmap((int)Math.Ceiling(width),(int)Math.Ceiling(height),96,96,PixelFormats.Pbgra32);
+    bitmap.Render(drawing);bitmap.Freeze();
+    window=new Window {Name="GridNestDragPreview",Owner=panel,WindowStyle=WindowStyle.None,
+     AllowsTransparency=true,Background=Brushes.Transparent,ResizeMode=ResizeMode.NoResize,
+     ShowInTaskbar=false,ShowActivated=false,Topmost=true,Focusable=false,IsHitTestVisible=false,
+     Width=width,Height=height,Opacity=.88,
+     Content=new Image {Source=bitmap,Stretch=Stretch.Fill,IsHitTestVisible=false}};
+    window.SourceInitialized+=(s,e)=> {
+     var handle=new WindowInteropHelper(window).Handle;
+     SetWindowStyle(handle,-20,GetWindowStyle(handle,-20)|0x20|0x08000000|0x80);
+    };
+    timer=new DispatcherTimer(DispatcherPriority.Input) {Interval=TimeSpan.FromMilliseconds(16)};
+    timer.Tick+=(s,e)=>UpdatePosition();
+    window.Closed+=(s,e)=> {timer.Stop();window=null;};
+    try {if(touchScreen.HasValue)UpdateTouchPosition(touchScreen.Value);else UpdatePosition();window.Show();if(!touchScreen.HasValue)timer.Start();}
+    catch {Dispose();throw;}
+   }
+   public void UpdateTouchPosition(Point pixels) {
+    if(window==null)return;var source=PresentationSource.FromVisual(owner);
+    var point=source==null?pixels:source.CompositionTarget.TransformFromDevice.Transform(pixels);
+    window.Left=point.X-hotspot.X;window.Top=point.Y-hotspot.Y;
+   }
+   public void UpdatePosition() {
+    if(window==null)return;
+    CursorPoint pixel;
+    if(!GetCursorPos(out pixel))return;
+    var source=PresentationSource.FromVisual(owner);
+    var point=new Point(pixel.X,pixel.Y);
+    if(source!=null)point=source.CompositionTarget.TransformFromDevice.Transform(point);
+    window.Left=point.X-hotspot.X;window.Top=point.Y-hotspot.Y;
+   }
+   public void Dispose() {
+    timer.Stop();
+    if(window!=null) {window.Close();window=null;}
+   }
+  }
+  void DragItem(StackPanel cell,string path) {
+   var data=new DataObject(DataFormats.FileDrop,new[]{path});
+   data.SetData(InternalDrag,path);
+   DragIconPreview preview=null;
+   double opacity=cell.Opacity;
+   GiveFeedbackEventHandler feedback=(s,e)=> {
+    if(preview!=null)preview.UpdatePosition();
+    e.UseDefaultCursors=true;
+   };
+   try {
+    try {preview=new DragIconPreview(this,(FrameworkElement)cell.Children[0]);}
+    catch(Exception ex) {Debug.WriteLine(ex.Message);}
+    if(preview!=null)cell.Opacity=.35;
+    cell.GiveFeedback+=feedback;
+    DragDrop.DoDragDrop(cell,data,DragDropEffects.Move|DragDropEffects.Copy);
+   } finally {
+    cell.GiveFeedback-=feedback;
+    if(preview!=null)preview.Dispose();
+    cell.Opacity=opacity;
+    foreach(var panel in Program.Panels) {panel.cache.Clear();panel.Refresh();}
+   }
+  }
+
+  static TouchDevice activeIconTouch;
+  static bool TouchMouse(MouseEventArgs args) {
+   return args.StylusDevice!=null&&args.StylusDevice.TabletDevice.Type==TabletDeviceType.Touch;
+  }
+  void AttachTouchItem(StackPanel cell,string path) {
+   TouchDevice device=null;
+   Point start=new Point();
+   bool moved=false,dragging=false;
+   double opacity=cell.Opacity;
+   PanningMode panning=scroll.PanningMode;
+   DragIconPreview preview=null;
+   var hold=new DispatcherTimer {Interval=TimeSpan.FromMilliseconds(450)};
+   Action cancel=()=> {
+    hold.Stop();
+    var contact=device;device=null;
+    if(activeIconTouch==contact)activeIconTouch=null;
+    if(dragging)scroll.PanningMode=panning;
+    dragging=false;
+    if(preview!=null) {preview.Dispose();preview=null;}
+    cell.Opacity=opacity;
+    if(contact!=null&&contact.Captured==cell)cell.ReleaseTouchCapture(contact);
+   };
+   hold.Tick+=(s,e)=> {
+    hold.Stop();if(device==null||moved)return;
+    var point=device.GetTouchPoint(this);
+    if(point.Action==TouchAction.Up||(point.Position-start).Length>8) {cancel();return;}
+    if(!cell.CaptureTouch(device)) {cancel();return;}
+    panning=scroll.PanningMode;scroll.PanningMode=PanningMode.None;dragging=true;
+    try {
+     var tile=(FrameworkElement)cell.Children[0];
+     preview=new DragIconPreview(this,tile,device.GetTouchPoint(tile).Position,PointToScreen(point.Position));
+     cell.Opacity=.35;
+    } catch(Exception ex) {Debug.WriteLine(ex.Message);}
+   };
+   cell.AddHandler(PreviewTouchDownEvent,new EventHandler<TouchEventArgs>((s,e)=> {
+    if(activeIconTouch!=null)return;
+    device=e.TouchDevice;activeIconTouch=device;start=e.GetTouchPoint(this).Position;
+    moved=false;opacity=cell.Opacity;hold.Start();
+   }),true);
+   EventHandler<TouchEventArgs> move=(s,e)=> {
+    if(device!=e.TouchDevice)return;
+    var point=e.GetTouchPoint(this).Position;
+    if((point-start).Length>8) {moved=true;hold.Stop();}
+    if(dragging) {if(preview!=null)preview.UpdateTouchPosition(PointToScreen(point));e.Handled=true;}
+   };
+   EventHandler<TouchEventArgs> up=(s,e)=> {
+    if(device!=e.TouchDevice)return;
+    var local=e.GetTouchPoint(this).Position;
+    if((local-start).Length>8)moved=true;
+    bool drop=dragging&&moved,menu=dragging&&!moved,tap=!dragging&&!moved;
+    Point screen=PointToScreen(local);
+    cancel();
+    if(drop) {
+     var target=Program.Panels.Where(panel=>panel.IsVisible&&!panel.retired)
+      .OrderByDescending(panel=>panel.Topmost).ThenByDescending(panel=>panel.IsActive)
+      .FirstOrDefault(panel=>new Rect(0,0,panel.Width,Math.Max(0,panel.Height-38)).Contains(panel.PointFromScreen(screen)));
+     if(target!=null) {
+      var position=target.icons.PointFromScreen(screen);
+      int index=Math.Max(0,(int)Math.Floor(position.Y/target.CellHeight))*target.columns+
+       Math.Max(0,Math.Min(target.columns-1,(int)Math.Floor(position.X/target.CellWidth)));
+      var errors=target.AddFiles(new[]{path},true,index);
+      foreach(var panel in Program.Panels)panel.Refresh();
+      if(errors.Count>0)MessageBox.Show(string.Join(Environment.NewLine,errors),"Не удалось перенести");
+     }
+    } else if(menu&&cell.ContextMenu!=null) {
+     cell.ContextMenu.PlacementTarget=cell;cell.ContextMenu.Placement=System.Windows.Controls.Primitives.PlacementMode.Bottom;cell.ContextMenu.IsOpen=true;
+    } else if(tap)Open(path);
+    e.Handled=true;
+   };
+   KeyEventHandler cancelKey=(s,e)=> {if(device!=null&&e.Key==Key.Escape) {cancel();e.Handled=true;}};
+   AddHandler(Keyboard.PreviewKeyDownEvent,cancelKey,true);
+   AddHandler(PreviewTouchMoveEvent,move,true);AddHandler(PreviewTouchUpEvent,up,true);
+   cell.Unloaded+=(s,e)=> {cancel();RemoveHandler(Keyboard.PreviewKeyDownEvent,cancelKey);RemoveHandler(PreviewTouchMoveEvent,move);RemoveHandler(PreviewTouchUpEvent,up);};
+   Stylus.SetIsPressAndHoldEnabled(cell,false);
+  }
+  void AttachTouchPanelMove(UIElement surface) {
+   TouchDevice device=null;Point start=new Point();double left=0,top=0;
+   Action restore=null;
+   surface.TouchDown+=(s,e)=> {
+    if(Program.Locked||device!=null)return;
+    device=e.TouchDevice;start=PointToScreen(e.GetTouchPoint(this).Position);
+    left=Left;top=Top;restore=CaptureLayout();surface.CaptureTouch(device);e.Handled=true;
+   };
+   surface.TouchMove+=(s,e)=> {
+    if(device!=e.TouchDevice)return;
+    var pixels=PointToScreen(e.GetTouchPoint(this).Position);
+    var source=PresentationSource.FromVisual(this);
+    var delta=source.CompositionTarget.TransformFromDevice.Transform(pixels)-source.CompositionTarget.TransformFromDevice.Transform(start);
+    var area=Program.Area(left+delta.X,top+delta.Y);
+    Left=Math.Max(area.Left,Math.Min(area.Right-Width,left+delta.X));Top=Math.Max(area.Top,Math.Min(area.Bottom-Height,top+delta.Y));e.Handled=true;
+   };
+   surface.TouchUp+=(s,e)=> {
+    if(device!=e.TouchDevice)return;
+    var contact=device;device=null;surface.ReleaseTouchCapture(contact);
+    Point point;
+    if(Program.FindPlacement(this,Left,Top,Width,Height,true,out point)) {Left=point.X;Top=point.Y;}
+    else {Left=left;Top=top;}
+    Save();if(Left!=left||Top!=top)Program.Remember(restore);e.Handled=true;
+   };
+   surface.LostTouchCapture+=(s,e)=> {if(device==e.TouchDevice) {device=null;Left=left;Top=top;Save();}};
+  }
+  void AttachTouchResize(UIElement surface) {
+   TouchDevice device=null;Point start=new Point();double width=0,height=0;
+   Action restore=null;
+   surface.PreviewTouchDown+=(s,e)=> {
+    if(Program.Locked||device!=null)return;
+    device=e.TouchDevice;start=e.GetTouchPoint(this).Position;width=Width;height=Height;restore=CaptureLayout();
+    surface.CaptureTouch(device);e.Handled=true;
+   };
+   surface.PreviewTouchMove+=(s,e)=> {
+    if(device!=e.TouchDevice)return;
+    var point=e.GetTouchPoint(this).Position;SnapSize(width+point.X-start.X,height+point.Y-start.Y);e.Handled=true;
+   };
+   surface.PreviewTouchUp+=(s,e)=> {
+    if(device!=e.TouchDevice)return;
+    var contact=device;device=null;surface.ReleaseTouchCapture(contact);AlignPosition();Save();
+    if(Width!=width||Height!=height)Program.Remember(restore);e.Handled=true;
+   };
+   surface.LostTouchCapture+=(s,e)=> {if(device==e.TouchDevice) {device=null;AlignPosition();Save();}};
+  }
+
   void DropFiles(object sender,DragEventArgs e) {
    e.Handled=true; if(!e.Data.GetDataPresent(DataFormats.FileDrop))return;
    bool move=e.Data.GetDataPresent(InternalDrag);
@@ -761,7 +1082,7 @@ namespace GridNest {
   }
   void UpdateBackground() { UpdateOutline();if(card!=null)card.Background=new SolidColorBrush(Color.FromArgb((byte)(alpha*255),background.R,background.G,background.B));double luma=.2126*background.R+.7152*background.G+.0722*background.B;Resources["PanelHandle"]=new SolidColorBrush(luma>150?Color.FromRgb(39,87,97):Color.FromRgb(167,214,213)); }
   sealed class DialogOwner : Forms.IWin32Window { public IntPtr Handle { get; private set; } public DialogOwner(Window w) { Handle=new WindowInteropHelper(w).Handle; } }
-  string iconTheme="Glass";
+  string iconTheme="Original";
   Color outlineColor=Color.FromRgb(138,229,213);
   double outlineThickness,outlineGlow;
   Border outlineLayer,glowLayer;
@@ -924,9 +1245,9 @@ namespace GridNest {
    picker.SelectionChanged+=(s,e)=>render();render();
   }
 
-  static string ValidIconTheme(string value) {return new[]{"Original","Glass","Pastel"}.Contains(value)?value:"Glass";}
+  static string ValidIconTheme(string value) {return new[]{"Original","Glass","Pastel"}.Contains(value)?value:"Original";}
   sealed class FolderStyle {
-   public string IconTheme="Glass";
+   public string IconTheme="Original";
    public string GlowMode="Inside";
    public bool GlowPulse;
    public Color OutlineColor=Color.FromRgb(138,229,213);
@@ -1016,7 +1337,7 @@ namespace GridNest {
      checks.Add(panel,check);targets.Children.Add(check);
     }
     var list=new ScrollViewer {Name="FolderRecipients",Content=targets,Height=260,
-     HorizontalScrollBarVisibility=ScrollBarVisibility.Disabled,VerticalScrollBarVisibility=ScrollBarVisibility.Auto};
+     HorizontalScrollBarVisibility=ScrollBarVisibility.Disabled,VerticalScrollBarVisibility=ScrollBarVisibility.Auto,PanningMode=PanningMode.VerticalOnly};
     var listFrame=new Border {Child=list,CornerRadius=new CornerRadius(7),BorderThickness=new Thickness(1)};
     listFrame.SetResourceReference(Border.BorderBrushProperty,"SettingsLine");
     recipients.Children.Add(listFrame);

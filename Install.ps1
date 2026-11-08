@@ -7,7 +7,7 @@ New-Item -ItemType Directory -Force -Path $data,$install | Out-Null
 foreach($file in @('GridNest.exe','app.ico','README.txt')) { Copy-Item -LiteralPath (Join-Path $PSScriptRoot $file) -Destination $install -Force }
 $marker=Join-Path $install 'initialized'
 if(!(Test-Path -LiteralPath $marker)) {
- foreach($name in @('Работа','AI','Сеть','VR')) { New-Item -ItemType Directory -Path (Join-Path $data $name) -Force | Out-Null }
+ if(!(Get-ChildItem -LiteralPath $data -Directory -Force | Where-Object { !$_.Name.StartsWith('.') })) { New-Item -ItemType Directory -Path (Join-Path $data 'игры') -Force | Out-Null }
  Set-Content -LiteralPath $marker -Value '1'
 }
 $shell=New-Object -ComObject WScript.Shell
