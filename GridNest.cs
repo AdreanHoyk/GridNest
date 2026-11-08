@@ -19,8 +19,8 @@ using System.Reflection;
 [assembly: AssemblyTitle("GridNest")]
 [assembly: AssemblyProduct("GridNest")]
 [assembly: AssemblyDescription("Desktop folder panels with a snap-to-grid layout")]
-[assembly: AssemblyVersion("0.15.3.0")]
-[assembly: AssemblyFileVersion("0.15.3.0")]
+[assembly: AssemblyVersion("0.15.4.0")]
+[assembly: AssemblyFileVersion("0.15.4.0")]
 
 namespace GridNest {
  public sealed class SettingsLayout {
@@ -225,13 +225,20 @@ namespace GridNest {
    if(undo==null)return;
    try { undo(); undo=null; } catch(Exception ex) { MessageBox.Show(ex.Message,"Отмена действия"); }
   }
-  public static Rect Area(double x,double y) {
+  public static Matrix DesktopScale() {
    var display=PresentationSource.CurrentSources.OfType<HwndSource>().FirstOrDefault(v=>v.CompositionTarget!=null);
-   var transform=display==null?Matrix.Identity:display.CompositionTarget.TransformToDevice;
-   var pixel=transform.Transform(new Point(x,y));
-   var bounds=Forms.Screen.FromPoint(new System.Drawing.Point((int)pixel.X,(int)pixel.Y)).WorkingArea;
-   return new Rect(bounds.X/transform.M11,bounds.Y/transform.M22,bounds.Width/transform.M11,bounds.Height/transform.M22);
+   if(display!=null)return display.CompositionTarget.TransformToDevice;
+   var primary=Forms.Screen.PrimaryScreen.WorkingArea;var logical=SystemParameters.WorkArea;
+   return new Matrix(primary.Width/Math.Max(1,logical.Width),0,0,primary.Height/Math.Max(1,logical.Height),0,0);
   }
+  public static MonitorInfo[] Monitors() {
+   var scale=DesktopScale();return Forms.Screen.AllScreens.Select((screen,index)=>new MonitorInfo {
+    Id=screen.DeviceName,Label="Экран "+(index+1)+" · "+screen.Bounds.Width+"×"+screen.Bounds.Height+(screen.Primary?" · основной":""),
+    WorkArea=new Rect(screen.WorkingArea.X/scale.M11,screen.WorkingArea.Y/scale.M22,screen.WorkingArea.Width/scale.M11,screen.WorkingArea.Height/scale.M22)
+   }).ToArray();
+  }
+  public static MonitorInfo MonitorAt(double x,double y) {return MonitorInfo.At(Monitors(),new Point(x,y));}
+  public static Rect Area(double x,double y) {return MonitorAt(x,y).WorkArea;}
   static void SavePreferences() {
    new XElement("Application",new XAttribute("Theme",ThemeMode),new XAttribute("Gap",MinPanelGap),new XAttribute("VerticalGap",MinVerticalGap),new XAttribute("Locked",Locked)).Save(Path.Combine(Home,"app-settings.xml"));
   }
@@ -398,13 +405,18 @@ namespace GridNest {
   }
   public static void OpenArchive() { var p=Path.Combine(Data,".archive"); Directory.CreateDirectory(p); PanelWindow.OpenPath(p); }
   public static void ArrangePanels() {
+   foreach(var monitor in Monitors())ArrangePanelsOnMonitor(monitor.Id);
+  }
+  public static void ArrangePanelsOnMonitor(string monitorId) {
    if(Locked)return;
-   if(Panels.Count==0)return;
-   var area=SystemParameters.WorkArea; double width=Panels.Max(p=>p.Width), step=Math.Ceiling((width+16)/PanelGrid)*PanelGrid;
+   var monitor=Monitors().FirstOrDefault(m=>m.Id==monitorId);if(monitor==null)return;
+   var group=Panels.Where(p=>MonitorAt(p.Left+p.Width/2,p.Top+p.Height/2).Id==monitorId).ToArray();
+   if(group.Length==0)return;
+   var area=monitor.WorkArea; double width=group.Max(p=>p.Width), step=Math.Ceiling((width+Math.Max(0,MinPanelGap))/PanelGrid)*PanelGrid;
    int maxCols=Math.Max(1,(int)Math.Floor((area.Width-32)/step)); int primary=Math.Min(3,maxCols);
    double start=area.Left+Math.Floor((area.Width-16-primary*step)/PanelGrid)*PanelGrid;
    var bottoms=Enumerable.Repeat(area.Top+16,maxCols).ToArray(); int missed=0;
-   foreach(var p in Panels) {
+   foreach(var p in group) {
     int best=-1; double bestY=double.MaxValue;
     for(int c=0;c<maxCols;c++) { double x=c<primary?start+c*step:start-(c-primary+1)*step; double y=bottoms[c]; if(x>=area.Left&&x+p.Width<=area.Right&&y+p.Height<=area.Bottom&&(best<0||c<primary&&best>=primary||((c<primary)==(best<primary)&&y<bestY))) { best=c; bestY=y; } }
     if(best<0) { missed++; continue; }
@@ -479,6 +491,8 @@ namespace GridNest {
   DispatcherTimer debounce; FileSystemWatcher watcher; bool loaded, labels=false; int iconSize=56; double alpha=0.84;
   Color background=Color.FromRgb(44,46,55);
   Dictionary<string,ImageSource> cache=new Dictionary<string,ImageSource>(StringComparer.OrdinalIgnoreCase);
+  int contentGeneration;
+  bool panelClosed;
   public PanelWindow(string n,int index) {
    name=n; folder=Path.Combine(Program.Data,n); config=Path.Combine(Program.Home,n+".xml"); Directory.CreateDirectory(folder);
    Title="GridNest — "+name; Width=266; Height=264; Left=30+index*290; Top=90;
@@ -551,6 +565,9 @@ namespace GridNest {
    var placementMenu=new MenuItem {Header="Размещение"};menu.Items.Add(placementMenu);
    Add(placementMenu,"Выровнять значки в этой папке",AlignIcons);
    placementMenu.Items.Add(new Separator());
+   var screenArrange=new MenuItem {Header="Выровнять папки на экране"};placementMenu.Items.Add(screenArrange);
+   Action updateScreenArrange=()=> {screenArrange.Items.Clear();foreach(var monitor in Program.Monitors()) {string id=monitor.Id;Add(screenArrange,monitor.Label,()=>Program.ArrangePanelsOnMonitor(id));}};
+   updateScreenArrange();
    Add(placementMenu,"Выровнять все по сетке",Program.ArrangePanels);
    var top=new MenuItem {Header="Поверх окон",IsCheckable=true};placementMenu.Items.Add(top);
    top.Click+=(s,e)=> {Topmost=top.IsChecked;Save();};
@@ -558,7 +575,7 @@ namespace GridNest {
    Add(menu,"Настройки приложения…",Program.AppSettings);
    Add(menu,"Помощь",()=>Open(Path.Combine(Program.Home,"README.txt")));
    Add(menu,"Выход",()=>Application.Current.Shutdown());
-   menu.Opened+=(s,e)=> {names.IsChecked=labels;motion.IsChecked=animations;top.IsChecked=Topmost;paste.IsEnabled=copiedStyle!=null;};
+   menu.Opened+=(s,e)=> {updateScreenArrange();names.IsChecked=labels;motion.IsChecked=animations;top.IsChecked=Topmost;paste.IsEnabled=copiedStyle!=null;};
    frame.ContextMenu=menu;
    PreviewMouseWheel+=(s,e)=> { if((Keyboard.Modifiers&ModifierKeys.Control)!=0) { SetIconSize(iconSize+(e.Delta>0?8:-8)); e.Handled=true; } };
    PreviewKeyDown+=(s,e)=> { if(e.Key==Key.Z&&Keyboard.Modifiers==ModifierKeys.Control) {Program.Undo();e.Handled=true;} else if(e.Key==Key.F&&(Keyboard.Modifiers&ModifierKeys.Control)!=0) { Program.Search(); e.Handled=true; } };
@@ -571,7 +588,7 @@ namespace GridNest {
    SizeChanged+=(s,e)=> { if(loaded&&!snapping) { SnapSize(Width,Height); Save(); } };
    LocationChanged+=(s,e)=>PositionOuterGlow();SizeChanged+=(s,e)=>PositionOuterGlow();
    IsVisibleChanged+=(s,e)=>UpdateOuterGlow();
-   Closed+=(s,e)=> {if(haloWindow!=null)haloWindow.Close();Save();watcher.Dispose();debounce.Stop();};
+   Closed+=(s,e)=> {panelClosed=true;System.Threading.Interlocked.Increment(ref contentGeneration);if(haloWindow!=null)haloWindow.Close();Save();watcher.Dispose();debounce.Stop();};
   }
   static ControlTemplate GripTemplate() {
    return (ControlTemplate)System.Windows.Markup.XamlReader.Parse(@"<ControlTemplate xmlns='http://schemas.microsoft.com/winfx/2006/xaml/presentation' xmlns:x='http://schemas.microsoft.com/winfx/2006/xaml' TargetType='Thumb'><Grid Background='Transparent'><Canvas Width='20' Height='12' HorizontalAlignment='Center' VerticalAlignment='Center' IsHitTestVisible='False'><Path Data='M 3,11 L 15,0 M 9,11 L 16,5' Stroke='#DD101820' StrokeThickness='4' StrokeStartLineCap='Round' StrokeEndLineCap='Round'/><Path x:Name='Glyph' Data='M 3,11 L 15,0 M 9,11 L 16,5' Stroke='White' StrokeThickness='1.8' StrokeStartLineCap='Round' StrokeEndLineCap='Round'/></Canvas></Grid><ControlTemplate.Triggers><Trigger Property='IsDragging' Value='True'><Setter TargetName='Glyph' Property='Stroke' Value='#8AE5D5'/></Trigger></ControlTemplate.Triggers></ControlTemplate>");
@@ -583,6 +600,7 @@ namespace GridNest {
    try { var x=XElement.Load(config); if(x.Attribute("Background")!=null)background=ParseColor((string)x.Attribute("Background")); } catch {}
    try {var x=XElement.Load(config);glowPulse=(bool?)x.Attribute("GlowPulse")??false;glowMode=ValidGlowMode((string)x.Attribute("GlowMode"));outlineColor=ParseColor((string)x.Attribute("OutlineColor")??"#8AE5D5");outlineThickness=Math.Max(0,Math.Min(8,Get(x,"OutlineThickness",0)));outlineGlow=Math.Max(0,Math.Min(100,Get(x,"OutlineGlow",0)));}catch{}
    try { animations=(string)XElement.Load(config).Attribute("Animations")!="false"; } catch {}
+   try {var x=XElement.Load(config);Point restored;if(x.Attribute("MonitorX")!=null&&x.Attribute("MonitorY")!=null&&MonitorInfo.Restore(Program.Monitors(),(string)x.Attribute("MonitorId"),Get(x,"MonitorX",0),Get(x,"MonitorY",0),out restored)){Left=restored.X;Top=restored.Y;}}catch{}
    try { storeFiles=(string)XElement.Load(config).Attribute("Mode")!="Shortcuts"; } catch {}
    Width=Math.Max(MinWidth,Width); Height=Math.Max(MinHeight,Height);
   }
@@ -628,7 +646,7 @@ namespace GridNest {
   void AttachDrag(UIElement surface,bool backgroundOnly=false) {
    if(!backgroundOnly)AttachTouchPanelMove(surface);
    bool dragging=false;Point start=new Point();double left=0,top=0;
-   Func<Point> cursor=()=> {var pixel=PointToScreen(Mouse.GetPosition(this));var source=PresentationSource.FromVisual(this);return source!=null?source.CompositionTarget.TransformFromDevice.Transform(pixel):pixel;};
+   Func<Point> cursor=()=> {var pixel=Forms.Cursor.Position;var scale=Program.DesktopScale();return new Point(pixel.X/scale.M11,pixel.Y/scale.M22);};
    System.Windows.Controls.Primitives.Popup preview=null;
    Point destination=new Point();Action restore=null;
    Action cancel=()=> {
@@ -664,7 +682,7 @@ namespace GridNest {
   }
   public void Save() {
    if(!loaded||retired)return;
-   try { new XElement("Panel",new XAttribute("Mode",storeFiles?"Files":"Shortcuts"),new XAttribute("Columns",columns),new XAttribute("Rows",rows),new XAttribute("Width",Width),new XAttribute("Height",Height),new XAttribute("Left",Left),new XAttribute("Top",Top),new XAttribute("IconTheme",iconTheme),new XAttribute("IconSize",iconSize),new XAttribute("Opacity",backdropPreview?committedAlpha:alpha),new XAttribute("GlowPulse",backdropPreview?committedGlowPulse:glowPulse),new XAttribute("GlowMode",backdropPreview?committedGlowMode:glowMode),new XAttribute("OutlineColor",ColorHex(backdropPreview?committedOutlineColor:outlineColor)),new XAttribute("OutlineThickness",backdropPreview?committedOutlineThickness:outlineThickness),new XAttribute("OutlineGlow",backdropPreview?committedOutlineGlow:outlineGlow),new XAttribute("Background",ColorHex(backdropPreview?committedBackground:background)),new XAttribute("Animations",animations?"true":"false"),new XAttribute("DarkCaption",darkCaption),new XAttribute("Labels",labels?"true":"false"),new XAttribute("Topmost",Topmost?"true":"false")).Save(config); } catch {}
+   try { var monitor=Program.MonitorAt(Left+Width/2,Top+Height/2);new XElement("Panel",new XAttribute("MonitorId",monitor.Id),new XAttribute("MonitorX",Left-monitor.WorkArea.Left),new XAttribute("MonitorY",Top-monitor.WorkArea.Top),new XAttribute("Mode",storeFiles?"Files":"Shortcuts"),new XAttribute("Columns",columns),new XAttribute("Rows",rows),new XAttribute("Width",Width),new XAttribute("Height",Height),new XAttribute("Left",Left),new XAttribute("Top",Top),new XAttribute("IconTheme",iconTheme),new XAttribute("IconSize",iconSize),new XAttribute("Opacity",backdropPreview?committedAlpha:alpha),new XAttribute("GlowPulse",backdropPreview?committedGlowPulse:glowPulse),new XAttribute("GlowMode",backdropPreview?committedGlowMode:glowMode),new XAttribute("OutlineColor",ColorHex(backdropPreview?committedOutlineColor:outlineColor)),new XAttribute("OutlineThickness",backdropPreview?committedOutlineThickness:outlineThickness),new XAttribute("OutlineGlow",backdropPreview?committedOutlineGlow:outlineGlow),new XAttribute("Background",ColorHex(backdropPreview?committedBackground:background)),new XAttribute("Animations",animations?"true":"false"),new XAttribute("DarkCaption",darkCaption),new XAttribute("Labels",labels?"true":"false"),new XAttribute("Topmost",Topmost?"true":"false")).Save(config); } catch {}
   }
   bool Motion { get { return animations&&SystemParameters.ClientAreaAnimation; } }
   void Fade(UIElement target,double opacity,int ms) {
@@ -720,6 +738,7 @@ namespace GridNest {
   }
   void Refresh() {
    if(retired)return;
+   int generation=System.Threading.Interlocked.Increment(ref contentGeneration);
    icons.Children.Clear();
    string[] files;
    try { files=FileEntries(); SyncOrder(files); } catch { return; }
@@ -733,7 +752,16 @@ namespace GridNest {
     var image=new Image { Source=source, Width=iconSize, Height=iconSize, Margin=new Thickness(0,4,0,0), Stretch=Stretch.Uniform, HorizontalAlignment=HorizontalAlignment.Center, RenderTransformOrigin=new Point(.5,.5) };
     var scale=new ScaleTransform(1,1); var lift=new TranslateTransform(); var transform=new TransformGroup(); transform.Children.Add(scale); transform.Children.Add(lift); image.RenderTransform=transform;
     cell.MouseEnter+=(s,e)=>IconMotion(scale,lift,1.08,-1); cell.MouseLeave+=(s,e)=>IconMotion(scale,lift,1,0);
-    RenderOptions.SetBitmapScalingMode(image,BitmapScalingMode.HighQuality); cell.Children.Add(IconTile(image,iconTheme,slot,iconSize));
+    bool contentPreview=ShellThumbnails.Supports(path);
+    RenderOptions.SetBitmapScalingMode(image,BitmapScalingMode.HighQuality); cell.Children.Add(IconTile(image,contentPreview?"Original":iconTheme,slot,iconSize));
+    if(contentPreview)ShellThumbnails.Request(path,iconSize*2,
+     ()=>System.Threading.Interlocked.CompareExchange(ref contentGeneration,0,0)==generation,
+     thumbnail=> {
+      if(Dispatcher.HasShutdownStarted)return;
+      Dispatcher.BeginInvoke(DispatcherPriority.Background,new Action(()=> {
+       if(!panelClosed&&!retired&&contentGeneration==generation&&thumbnail!=null)image.Source=thumbnail;
+      }));
+     });
     if(labels) cell.Children.Add(new TextBlock { Text=IsShortcut(path)?Path.GetFileNameWithoutExtension(path):Path.GetFileName(path), FontSize=11, Foreground=Brushes.White, TextAlignment=TextAlignment.Center, TextTrimming=TextTrimming.CharacterEllipsis, Height=16,LineHeight=16,Margin=new Thickness(0,0,0,8) });
     Point start=new Point(); bool pressed=false,dragged=false;
     cell.PreviewMouseLeftButtonDown+=(s,e)=> { if(TouchMouse(e))return;start=e.GetPosition(this); pressed=true; dragged=false; cell.Focus(); cell.CaptureMouse(); IconMotion(scale,lift,.94,1); e.Handled=true; };
@@ -915,7 +943,8 @@ namespace GridNest {
     var pixels=PointToScreen(e.GetTouchPoint(this).Position);
     var source=PresentationSource.FromVisual(this);
     var delta=source.CompositionTarget.TransformFromDevice.Transform(pixels)-source.CompositionTarget.TransformFromDevice.Transform(start);
-    var area=Program.Area(left+delta.X,top+delta.Y);
+    var cursor=source.CompositionTarget.TransformFromDevice.Transform(pixels);
+    var area=Program.Area(cursor.X,cursor.Y);
     Left=Math.Max(area.Left,Math.Min(area.Right-Width,left+delta.X));Top=Math.Max(area.Top,Math.Min(area.Bottom-Height,top+delta.Y));e.Handled=true;
    };
    surface.TouchUp+=(s,e)=> {
@@ -1636,15 +1665,59 @@ namespace GridNest {
    finally { storeFiles=oldMode; iconSize=oldSize; SetGrid(oldColumns,oldRows); background=oldBackground; UpdateBackground(); Save(); foreach(string p in new[]{first,second,third,dataTarget,dataTarget2}) if(File.Exists(p))File.Delete(p); if(Directory.Exists(directoryTarget)&&Path.GetFullPath(directoryTarget).StartsWith(Path.GetFullPath(folder)+Path.DirectorySeparatorChar,StringComparison.OrdinalIgnoreCase)&&Path.GetFileName(directoryTarget)==id+"-folder")Directory.Delete(directoryTarget,true); if(Directory.Exists(temp))Directory.Delete(temp,true); order=oldOrder; SaveOrder(); cache.Clear(); Refresh(); UpdateLayout(); }
   }
  }
+ public sealed class MonitorInfo {
+  public string Id,Label;
+  public Rect WorkArea;
+  public static MonitorInfo At(IEnumerable<MonitorInfo> monitors,Point point) {
+   var containing=monitors.FirstOrDefault(m=>point.X>=m.WorkArea.Left&&point.X<m.WorkArea.Right&&point.Y>=m.WorkArea.Top&&point.Y<m.WorkArea.Bottom);
+   if(containing!=null)return containing;
+   return monitors.OrderBy(m=> {
+    var a=m.WorkArea;double dx=Math.Max(a.Left-point.X,Math.Max(0,point.X-a.Right));double dy=Math.Max(a.Top-point.Y,Math.Max(0,point.Y-a.Bottom));return dx*dx+dy*dy;
+   }).First();
+  }
+  public static bool Restore(IEnumerable<MonitorInfo> monitors,string id,double x,double y,out Point location) {
+   var monitor=monitors.FirstOrDefault(m=>string.Equals(m.Id,id,StringComparison.OrdinalIgnoreCase));location=new Point();
+   if(monitor==null||double.IsNaN(x)||double.IsInfinity(x)||double.IsNaN(y)||double.IsInfinity(y))return false;
+   location=new Point(monitor.WorkArea.Left+x,monitor.WorkArea.Top+y);return true;
+  }
+ }
  public static class ShellIcon {
   [StructLayout(LayoutKind.Sequential)] struct SIZE { public int cx,cy; }
   [ComImport,Guid("bcc18b79-ba16-442f-80c4-8a59c30c463b"),InterfaceType(ComInterfaceType.InterfaceIsIUnknown)] interface IShellItemImageFactory { [PreserveSig] int GetImage(SIZE size,uint flags,out IntPtr bitmap); }
   [DllImport("shell32.dll",CharSet=CharSet.Unicode,PreserveSig=true)] static extern int SHCreateItemFromParsingName(string path,IntPtr context,ref Guid iid,[MarshalAs(UnmanagedType.Interface)] out IShellItemImageFactory factory);
   [DllImport("gdi32.dll")] static extern bool DeleteObject(IntPtr obj);
-  public static ImageSource Get(string path,int size) {
+  public static ImageSource Get(string path,int size) {return GetImage(path,size,0x4|0x1);}
+  public static ImageSource GetThumbnail(string path,int size) {return GetImage(path,size,0x8|0x1);}
+  static ImageSource GetImage(string path,int size,uint flags) {
    IShellItemImageFactory factory=null; IntPtr bitmap=IntPtr.Zero;
-   try { Guid id=new Guid("bcc18b79-ba16-442f-80c4-8a59c30c463b"); if(SHCreateItemFromParsingName(path,IntPtr.Zero,ref id,out factory)!=0)return null; if(factory.GetImage(new SIZE { cx=size,cy=size },0x4|0x1,out bitmap)!=0)return null; var result=Imaging.CreateBitmapSourceFromHBitmap(bitmap,IntPtr.Zero,Int32Rect.Empty,BitmapSizeOptions.FromEmptyOptions()); result.Freeze(); return result; }
+   try { Guid id=new Guid("bcc18b79-ba16-442f-80c4-8a59c30c463b"); if(SHCreateItemFromParsingName(path,IntPtr.Zero,ref id,out factory)!=0)return null; if(factory.GetImage(new SIZE { cx=size,cy=size },flags,out bitmap)!=0)return null; var result=Imaging.CreateBitmapSourceFromHBitmap(bitmap,IntPtr.Zero,Int32Rect.Empty,BitmapSizeOptions.FromEmptyOptions()); result.Freeze(); return result; }
    catch { return null; } finally { if(bitmap!=IntPtr.Zero)DeleteObject(bitmap); if(factory!=null)Marshal.ReleaseComObject(factory); }
+  }
+ }
+ public static class ShellThumbnails {
+  static readonly HashSet<string> extensions=new HashSet<string>(new[]{".jpg",".jpeg",".png",".bmp",".gif",".tif",".tiff",".webp",".heic",".heif",".avif",".ico",".mp4",".mov",".avi",".mkv",".pdf"},StringComparer.OrdinalIgnoreCase);
+  static readonly System.Collections.Concurrent.BlockingCollection<Action> work=new System.Collections.Concurrent.BlockingCollection<Action>();
+  static readonly Dictionary<string,ImageSource> images=new Dictionary<string,ImageSource>(StringComparer.OrdinalIgnoreCase);
+  static readonly Queue<string> keys=new Queue<string>();
+  static ShellThumbnails() {
+   var thread=new System.Threading.Thread(()=> {foreach(var action in work.GetConsumingEnumerable())try {action();}catch {}}) {IsBackground=true,Name="GridNest thumbnails"};
+   thread.SetApartmentState(System.Threading.ApartmentState.STA);thread.Start();
+  }
+  public static bool Supports(string path) {return extensions.Contains(Path.GetExtension(path));}
+  public static void Request(string path,int size,Func<bool> current,Action<ImageSource> completed) {
+   work.Add(()=> {
+    if(!current())return;
+    ImageSource result=null;
+    try {
+     var file=new FileInfo(path);if(!file.Exists){completed(null);return;}
+     string key=path+"|"+size+"|"+file.Length+"|"+file.LastWriteTimeUtc.Ticks;
+     if(!images.TryGetValue(key,out result)) {
+      result=ShellIcon.GetThumbnail(path,size);images[key]=result;keys.Enqueue(key);
+      while(keys.Count>256)images.Remove(keys.Dequeue());
+     }
+    } catch {}
+    if(current())completed(result);
+   });
   }
  }
 }
