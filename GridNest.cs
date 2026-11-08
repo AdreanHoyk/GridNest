@@ -19,8 +19,8 @@ using System.Reflection;
 [assembly: AssemblyTitle("GridNest")]
 [assembly: AssemblyProduct("GridNest")]
 [assembly: AssemblyDescription("Desktop folder panels with a snap-to-grid layout")]
-[assembly: AssemblyVersion("0.13.1.0")]
-[assembly: AssemblyFileVersion("0.13.1.0")]
+[assembly: AssemblyVersion("0.13.2.0")]
+[assembly: AssemblyFileVersion("0.13.2.0")]
 
 namespace GridNest {
  public sealed class SettingsLayout {
@@ -349,7 +349,10 @@ namespace GridNest {
    frame.Children.Add(card);
    glowLayer=new Border {CornerRadius=new CornerRadius(30),IsHitTestVisible=false};
    outlineLayer=new Border {CornerRadius=new CornerRadius(30),IsHitTestVisible=false};
-   frame.Children.Add(glowLayer);frame.Children.Add(outlineLayer);UpdateOutline();
+   var glowHost=new Grid {IsHitTestVisible=false};
+   glowHost.Children.Add(glowLayer);
+   glowHost.SizeChanged+=(s,e)=>glowHost.Clip=new RectangleGeometry(new Rect(0,0,glowHost.ActualWidth,glowHost.ActualHeight),30,30);
+   frame.Children.Add(glowHost);frame.Children.Add(outlineLayer);UpdateOutline();
    Grid content=new Grid(); card.Child=content;
    content.RowDefinitions.Add(new RowDefinition());
    content.RowDefinitions.Add(new RowDefinition { Height=new GridLength(12) });
