@@ -19,8 +19,8 @@ using System.Reflection;
 [assembly: AssemblyTitle("GridNest")]
 [assembly: AssemblyProduct("GridNest")]
 [assembly: AssemblyDescription("Desktop folder panels with a snap-to-grid layout")]
-[assembly: AssemblyVersion("0.15.2.0")]
-[assembly: AssemblyFileVersion("0.15.2.0")]
+[assembly: AssemblyVersion("0.15.3.0")]
+[assembly: AssemblyFileVersion("0.15.3.0")]
 
 namespace GridNest {
  public sealed class SettingsLayout {
@@ -217,6 +217,7 @@ namespace GridNest {
   static Window searchWindow;
   public const int PanelGrid=16;
   public static int MinPanelGap=16;
+  public static int MinVerticalGap=8;
   public static bool Locked;
   static Action undo;
   public static void Remember(Action action) { undo=action; }
@@ -232,7 +233,7 @@ namespace GridNest {
    return new Rect(bounds.X/transform.M11,bounds.Y/transform.M22,bounds.Width/transform.M11,bounds.Height/transform.M22);
   }
   static void SavePreferences() {
-   new XElement("Application",new XAttribute("Theme",ThemeMode),new XAttribute("Gap",MinPanelGap),new XAttribute("Locked",Locked)).Save(Path.Combine(Home,"app-settings.xml"));
+   new XElement("Application",new XAttribute("Theme",ThemeMode),new XAttribute("Gap",MinPanelGap),new XAttribute("VerticalGap",MinVerticalGap),new XAttribute("Locked",Locked)).Save(Path.Combine(Home,"app-settings.xml"));
   }
   public static bool LayoutReady;
   public static string ThemeMode="Dark";
@@ -245,7 +246,7 @@ namespace GridNest {
    Directory.CreateDirectory(Home); Directory.CreateDirectory(Data);
    AppDomain.CurrentDomain.UnhandledException += (s,e) => { try { File.WriteAllText(Path.Combine(Home,"error.log"),e.ExceptionObject.ToString()); } catch {} };
    Application app = new Application(); app.ShutdownMode=ShutdownMode.OnExplicitShutdown;
-   try { var prefs=XElement.Load(Path.Combine(Home,"app-settings.xml")); int gap=(int?)prefs.Attribute("Gap")??16; MinPanelGap=new[]{-1,0,8,16}.Contains(gap)?gap:16; Locked=(bool?)prefs.Attribute("Locked")??false;string mode=(string)prefs.Attribute("Theme"); if(new[]{"Dark","Light","System"}.Contains(mode))ThemeMode=mode; } catch {}
+   try { var prefs=XElement.Load(Path.Combine(Home,"app-settings.xml")); int gap=(int?)prefs.Attribute("Gap")??16; MinPanelGap=new[]{-1,0,8,16}.Contains(gap)?gap:16; int vertical=(int?)prefs.Attribute("VerticalGap")??8;MinVerticalGap=new[]{0,8,16}.Contains(vertical)?vertical:8; Locked=(bool?)prefs.Attribute("Locked")??false;string mode=(string)prefs.Attribute("Theme"); if(new[]{"Dark","Light","System"}.Contains(mode))ThemeMode=mode; } catch {}
    try {SavePreferences();}catch(Exception ex) {Debug.WriteLine(ex.Message);}
    ApplyAppearance();
    EventManager.RegisterClassHandler(typeof(Window),FrameworkElement.LoadedEvent,new RoutedEventHandler((s,e)=> {var window=s as Window;if(window!=null&&e.OriginalSource==window)PaintCaption(window);}));
@@ -325,17 +326,21 @@ namespace GridNest {
    appearance.Children.Add(dark);appearance.Children.Add(light);appearance.Children.Add(system);
    SettingsLayout.Hint(appearance,"Тема меню и окон настроек. Оформление папок настраивается отдельно.");
    var placement=SettingsLayout.Section(layout.Body,"Размещение папок");
-   placement.Children.Add(new TextBlock {Text="Минимальный отступ",Margin=new Thickness(0,0,0,6)});
+   placement.Children.Add(new TextBlock {Text="Отступ по горизонтали",Margin=new Thickness(0,0,0,6)});
    var gaps=new[]{-1,0,8,16};
    var spacing=new ComboBox {ItemsSource=new[]{"Разрешить наложение","Вплотную","8 пикселей","16 пикселей"},SelectedIndex=Array.IndexOf(gaps,MinPanelGap)};
    placement.Children.Add(spacing);
+   placement.Children.Add(new TextBlock {Text="Отступ под названием до следующей папки",Margin=new Thickness(0,10,0,6)});
+   var verticalGaps=new[]{0,8,16};
+   var verticalSpacing=new ComboBox {ItemsSource=new[]{"Вплотную","8 пикселей","16 пикселей"},SelectedIndex=Array.IndexOf(verticalGaps,MinVerticalGap)};
+   placement.Children.Add(verticalSpacing);
    var locked=new CheckBox {Content="Закрепить положение и размер папок",IsChecked=Locked,Margin=new Thickness(0,12,0,0)};
    placement.Children.Add(locked);
    var updates=new Button {Content="Проверить обновления… · "+AppUpdater.InstalledVersion,HorizontalAlignment=HorizontalAlignment.Left,Margin=new Thickness(0,6,0,0)};layout.Body.Children.Add(updates);updates.Click+=(s,e)=>AppUpdater.Show(w);
    var apply=new Button {Name="SaveApplicationSettings",Content="Применить"};
    SettingsLayout.Buttons(layout.Actions,w,apply);
    apply.Click+=(s,e)=> {
-    Locked=locked.IsChecked==true;MinPanelGap=gaps[spacing.SelectedIndex];
+    Locked=locked.IsChecked==true;MinPanelGap=gaps[spacing.SelectedIndex];MinVerticalGap=verticalGaps[verticalSpacing.SelectedIndex];
     SelectTheme(light.IsChecked==true?"Light":system.IsChecked==true?"System":"Dark");
     foreach(var panel in Panels) {panel.RefreshIconTheme();panel.UpdateHandles();}
     w.Close();
@@ -350,7 +355,7 @@ namespace GridNest {
    return ClearOfPanels(except,x,y,width,height);
   }
   static bool ClearOfPanels(PanelWindow except,double x,double y,double width,double height) {
-   return MinPanelGap<0 || Panels.Where(p=>p!=except).All(p=>x+width<=p.Left-MinPanelGap+.01||x>=p.Left+p.Width+MinPanelGap-.01||y+height<=p.Top-MinPanelGap+.01||y>=p.Top+p.Height+MinPanelGap-.01);
+   return MinPanelGap<0 || Panels.Where(p=>p!=except).All(p=>x+width<=p.Left-MinPanelGap+.01||x>=p.Left+p.Width+MinPanelGap-.01||y+height<=p.Top-MinVerticalGap+.01||y>=p.Top+p.Height+MinVerticalGap-.01);
   }
   public static bool FindPlacement(PanelWindow panel,double x,double y,double width,double height,bool search,out Point result) {
    var a=Area(x,y);double maxX=a.Left+Math.Floor((a.Width-width)/PanelGrid)*PanelGrid,maxY=a.Top+Math.Floor((a.Height-height)/PanelGrid)*PanelGrid;
@@ -377,8 +382,7 @@ namespace GridNest {
    var panel=new PanelWindow(name,Panels.Count);panel.storeFiles=files;if(LayoutReady&&!panel.PrepareGrid()) {panel.Close();if(!Directory.EnumerateFileSystemEntries(target).Any())Directory.Delete(target);throw new IOException("Для новой папки не хватает места. Уменьшите или переместите другие панели.");}Panels.Add(panel);panel.Show();
    var a=SystemParameters.WorkArea; bool placed=false;
    for(double y=a.Top+16;y+panel.Height<=a.Bottom&&!placed;y+=PanelGrid)for(double x=a.Right-panel.Width-16;x>=a.Left;x-=PanelGrid) {
-    var rect=new Rect(x,y,panel.Width+16,panel.Height+16);
-    if(Panels.Where(p=>p!=panel).All(p=>!rect.IntersectsWith(new Rect(p.Left,p.Top,p.Width+16,p.Height+16)))) { panel.Left=x; panel.Top=y; placed=true; break; }
+    if(ClearOfPanels(panel,x,y,panel.Width,panel.Height)) { panel.Left=x; panel.Top=y; placed=true; break; }
    }
    panel.AlignPosition(); panel.Save(); return panel;
   }
@@ -404,7 +408,7 @@ namespace GridNest {
     int best=-1; double bestY=double.MaxValue;
     for(int c=0;c<maxCols;c++) { double x=c<primary?start+c*step:start-(c-primary+1)*step; double y=bottoms[c]; if(x>=area.Left&&x+p.Width<=area.Right&&y+p.Height<=area.Bottom&&(best<0||c<primary&&best>=primary||((c<primary)==(best<primary)&&y<bestY))) { best=c; bestY=y; } }
     if(best<0) { missed++; continue; }
-    p.Left=best<primary?start+best*step:start-(best-primary+1)*step; p.Top=bestY; p.Save(); bottoms[best]=area.Top+Math.Ceiling((bestY-area.Top+p.Height+16)/PanelGrid)*PanelGrid;
+    p.Left=best<primary?start+best*step:start-(best-primary+1)*step; p.Top=bestY; p.Save(); bottoms[best]=area.Top+Math.Ceiling((bestY-area.Top+p.Height+MinVerticalGap)/PanelGrid)*PanelGrid;
    }
    if(missed>0)MessageBox.Show("Для всех папок не хватило места. Уменьшите размер крупных папок и повторите выравнивание.","Выравнивание");
   }
@@ -545,6 +549,8 @@ namespace GridNest {
    animationMenu=motion;appearanceMenu.Items.Add(motion);
    motion.Click+=(s,e)=> {animations=motion.IsChecked;UpdateOutline();Refresh();Save();};
    var placementMenu=new MenuItem {Header="Размещение"};menu.Items.Add(placementMenu);
+   Add(placementMenu,"Выровнять значки в этой папке",AlignIcons);
+   placementMenu.Items.Add(new Separator());
    Add(placementMenu,"Выровнять все по сетке",Program.ArrangePanels);
    var top=new MenuItem {Header="Поверх окон",IsCheckable=true};placementMenu.Items.Add(top);
    top.Click+=(s,e)=> {Topmost=top.IsChecked;Save();};
@@ -689,12 +695,28 @@ namespace GridNest {
    while(order.Count>0&&string.IsNullOrEmpty(order[order.Count-1]))order.RemoveAt(order.Count-1);
   }
   void PlaceAt(string fileName,int index) {
-   index=Math.Max(0,Math.Min(4095,index)); int previous=order.FindIndex(n=>n.Equals(fileName,StringComparison.OrdinalIgnoreCase));
-   while(order.Count<=index)order.Add("");
-   string displaced=order[index]; order[index]=fileName;
-   if(previous>=0&&previous!=index)order[previous]=displaced;
-   else if(previous<0&&!string.IsNullOrEmpty(displaced)) { int hole=order.FindIndex(string.IsNullOrEmpty); if(hole<0)order.Add(displaced); else order[hole]=displaced; }
+   index=Math.Max(0,Math.Min(4095,index)); int previous=order.FindIndex(n=>string.Equals(n,fileName,StringComparison.OrdinalIgnoreCase));
+   if(previous==index)return;
+   if(index>=order.Count||string.IsNullOrEmpty(order[index])) {
+    if(previous>=0)order[previous]="";
+    while(order.Count<=index)order.Add("");
+    order[index]=fileName;
+    while(order.Count>0&&string.IsNullOrEmpty(order[order.Count-1]))order.RemoveAt(order.Count-1);
+    SaveOrder();return;
+   }
+   if(previous>=0)order.RemoveAt(previous);
+   while(order.Count<index)order.Add("");
+   order.Insert(index,fileName);
+   while(order.Count>0&&string.IsNullOrEmpty(order[order.Count-1]))order.RemoveAt(order.Count-1);
    SaveOrder();
+  }
+  void AlignIcons() {
+   Refresh();
+   var previous=new List<string>(order);
+   var compact=order.Where(n=>!string.IsNullOrEmpty(n)).ToList();
+   if(previous.SequenceEqual(compact))return;
+   order=compact;SaveOrder();Refresh();
+   Program.Remember(()=> {if(retired)return;order=new List<string>(previous);Refresh();SaveOrder();});
   }
   void Refresh() {
    if(retired)return;
