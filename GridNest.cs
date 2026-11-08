@@ -19,35 +19,48 @@ using System.Reflection;
 [assembly: AssemblyTitle("GridNest")]
 [assembly: AssemblyProduct("GridNest")]
 [assembly: AssemblyDescription("Desktop folder panels with a snap-to-grid layout")]
-[assembly: AssemblyVersion("0.13.2.0")]
-[assembly: AssemblyFileVersion("0.13.2.0")]
+[assembly: AssemblyVersion("0.14.0.0")]
+[assembly: AssemblyFileVersion("0.14.0.0")]
 
 namespace GridNest {
  public sealed class SettingsLayout {
   public readonly StackPanel Body;
   public readonly StackPanel Actions;
+  Grid root;
+  ScrollViewer contentScroll;
+  TabControl pages;
   public SettingsLayout(Window window) {
    window.MinWidth=Math.Min(window.Width,400);
    window.MinHeight=Math.Min(window.Height,260);
    window.MaxHeight=Program.Area(window.Left,window.Top).Height;
-   var grid=new Grid();
+   var grid=new Grid();root=grid;
    grid.RowDefinitions.Add(new RowDefinition());
    grid.RowDefinitions.Add(new RowDefinition {Height=GridLength.Auto});
    Body=new StackPanel {Margin=new Thickness(22,20,22,8)};
    var scroll=new ScrollViewer {Name="SettingsScroll",Content=Body,VerticalScrollBarVisibility=ScrollBarVisibility.Auto,HorizontalScrollBarVisibility=ScrollBarVisibility.Disabled};
-   grid.Children.Add(scroll);
+   grid.Children.Add(scroll);contentScroll=scroll;
    Actions=new StackPanel {Margin=new Thickness(22,14,22,16)};
    var footer=new Border {BorderThickness=new Thickness(0,1,0,0),Child=Actions};
    footer.SetResourceReference(Border.BorderBrushProperty,"SettingsLine");
    footer.SetResourceReference(Border.BackgroundProperty,"SettingsSurface");
    Grid.SetRow(footer,1);grid.Children.Add(footer);window.Content=grid;
   }
+  public StackPanel Page(string title) {
+   if(pages==null) {
+    pages=new TabControl {Name="SettingsTabs",Margin=new Thickness(20,16,20,8)};
+    root.Children.Remove(contentScroll);root.Children.Insert(0,pages);
+   }
+   var content=new StackPanel {Margin=new Thickness(0,14,8,8)};
+   var scroll=new ScrollViewer {Name="SettingsScroll",Content=content,VerticalScrollBarVisibility=ScrollBarVisibility.Auto,HorizontalScrollBarVisibility=ScrollBarVisibility.Disabled};
+   pages.Items.Add(new TabItem {Header=title,Content=scroll});
+   return content;
+  }
   public static StackPanel Section(StackPanel parent,string title) {
    var content=new StackPanel();
    var box=new StackPanel();
-   box.Children.Add(new TextBlock {Text=title,FontSize=16,FontWeight=FontWeights.SemiBold,Margin=new Thickness(0,0,0,12)});
+   box.Children.Add(new TextBlock {Text=title,FontSize=14,FontWeight=FontWeights.SemiBold,Margin=new Thickness(0,0,0,8)});
    box.Children.Add(content);
-   var border=new Border {Child=box,Padding=new Thickness(16),CornerRadius=new CornerRadius(10),BorderThickness=new Thickness(1),Margin=new Thickness(0,0,0,14)};
+   var border=new Border {Child=box,Padding=new Thickness(12),CornerRadius=new CornerRadius(8),BorderThickness=new Thickness(1),Margin=new Thickness(0,0,0,10)};
    border.SetResourceReference(Border.BackgroundProperty,"SettingsSurface");
    border.SetResourceReference(Border.BorderBrushProperty,"SettingsLine");
    parent.Children.Add(border);return content;
@@ -179,7 +192,7 @@ namespace GridNest {
    public override System.Drawing.Color MenuItemBorder {get{return MenuItemSelected;}}
   }
   public static void AppSettings() {
-   var w=new Window {Title="Настройки приложения — GridNest",Width=480,Height=560,WindowStartupLocation=WindowStartupLocation.CenterScreen};
+   var w=new Window {Title="Настройки приложения — GridNest",Width=460,Height=500,WindowStartupLocation=WindowStartupLocation.CenterScreen};
    var layout=new SettingsLayout(w);
    var appearance=SettingsLayout.Section(layout.Body,"Тема приложения");
    var dark=new RadioButton {Content="Тёмная",GroupName="AppTheme",IsChecked=ThemeMode=="Dark"};
@@ -225,7 +238,7 @@ namespace GridNest {
   }
   public static void HidePanels() { foreach(var p in Panels)p.Hide(); if(searchWindow!=null)searchWindow.Hide(); }
   public static void Prompt(string title,string initial,Action<string> apply) {
-   var w=new Window { Title=title, Width=420, Height=260, ResizeMode=ResizeMode.NoResize, WindowStartupLocation=WindowStartupLocation.CenterScreen };
+   var w=new Window { Title=title, Width=420, Height=220, ResizeMode=ResizeMode.NoResize, WindowStartupLocation=WindowStartupLocation.CenterScreen };
    var layout=new SettingsLayout(w);var sp=layout.Body;
    var input=new TextBox { Text=initial, Margin=new Thickness(0,0,0,14) }; sp.Children.Add(input);
    var ok=new Button { Content="Создать", IsDefault=true, Padding=new Thickness(10,6,10,6) }; SettingsLayout.Buttons(layout.Actions,w,ok);
@@ -245,7 +258,7 @@ namespace GridNest {
    panel.AlignPosition(); panel.Save(); return panel;
   }
   public static void CreateFolder() {
-   var w=new Window { Title="Новая папка — GridNest", Width=480, Height=440, WindowStartupLocation=WindowStartupLocation.CenterScreen };
+   var w=new Window { Title="Новая папка — GridNest", Width=480, Height=350, WindowStartupLocation=WindowStartupLocation.CenterScreen };
    var layout=new SettingsLayout(w);var sp=layout.Body;
    sp.Children.Add(new TextBlock { Text="Название папки", Margin=new Thickness(0,0,0,6) });
    var input=new TextBox { Text="Новая папка", Margin=new Thickness(0,0,0,12) }; sp.Children.Add(input);
@@ -333,7 +346,7 @@ namespace GridNest {
   public string FolderName { get { return name; } }
   public string FolderPath { get { return folder; } }
   double CellWidth { get { return iconSize+16; } }
-  double CellHeight { get { return iconSize+(labels?30:10); } }
+  double CellHeight { get { return iconSize+(labels?36:16); } }
   DispatcherTimer debounce; FileSystemWatcher watcher; bool loaded, labels=false; int iconSize=56; double alpha=0.84;
   Color background=Color.FromRgb(44,46,55);
   Dictionary<string,ImageSource> cache=new Dictionary<string,ImageSource>(StringComparer.OrdinalIgnoreCase);
@@ -345,7 +358,7 @@ namespace GridNest {
    ShowInTaskbar=false; ResizeMode=ResizeMode.NoResize;
    Load();LoadDefaultStyle();
    frame=new Grid(); frame.RowDefinitions.Add(new RowDefinition()); frame.RowDefinitions.Add(new RowDefinition { Height=new GridLength(38) }); Content=frame;
-   card=new Border { CornerRadius=new CornerRadius(30), Padding=new Thickness(14), AllowDrop=true }; UpdateBackground();
+   card=new Border { CornerRadius=new CornerRadius(30), Padding=new Thickness(0), AllowDrop=true }; UpdateBackground();
    frame.Children.Add(card);
    glowLayer=new Border {CornerRadius=new CornerRadius(30),IsHitTestVisible=false};
    outlineLayer=new Border {CornerRadius=new CornerRadius(30),IsHitTestVisible=false};
@@ -354,22 +367,22 @@ namespace GridNest {
    glowHost.SizeChanged+=(s,e)=>glowHost.Clip=new RectangleGeometry(new Rect(0,0,glowHost.ActualWidth,glowHost.ActualHeight),30,30);
    frame.Children.Add(glowHost);frame.Children.Add(outlineLayer);UpdateOutline();
    Grid content=new Grid(); card.Child=content;
-   content.RowDefinitions.Add(new RowDefinition());
-   content.RowDefinitions.Add(new RowDefinition { Height=new GridLength(12) });
+
    icons=new WrapPanel { Orientation=Orientation.Horizontal, VerticalAlignment=VerticalAlignment.Top };
-   scroll=new ScrollViewer { Content=icons, HorizontalScrollBarVisibility=ScrollBarVisibility.Disabled, VerticalScrollBarVisibility=ScrollBarVisibility.Auto, PanningMode=PanningMode.VerticalOnly };
+   scroll=new ScrollViewer { Content=icons, HorizontalScrollBarVisibility=ScrollBarVisibility.Disabled, VerticalScrollBarVisibility=ScrollBarVisibility.Auto, PanningMode=PanningMode.VerticalOnly,Margin=new Thickness(16),ClipToBounds=false };
+   scroll.Template=(ControlTemplate)System.Windows.Markup.XamlReader.Parse(@"<ControlTemplate xmlns='http://schemas.microsoft.com/winfx/2006/xaml/presentation' xmlns:p='clr-namespace:System.Windows.Controls.Primitives;assembly=PresentationFramework' xmlns:x='http://schemas.microsoft.com/winfx/2006/xaml' TargetType='ScrollViewer'><Grid><ScrollContentPresenter x:Name='PART_ScrollContentPresenter' Content='{TemplateBinding Content}' ContentTemplate='{TemplateBinding ContentTemplate}' CanContentScroll='{TemplateBinding CanContentScroll}'/><p:ScrollBar x:Name='PART_VerticalScrollBar' Width='8' Margin='0,0,-8,0' HorizontalAlignment='Right' Orientation='Vertical' Maximum='{TemplateBinding ScrollableHeight}' ViewportSize='{TemplateBinding ViewportHeight}' Value='{Binding VerticalOffset,RelativeSource={RelativeSource TemplatedParent},Mode=OneWay}' Visibility='{TemplateBinding ComputedVerticalScrollBarVisibility}'/></Grid></ControlTemplate>");
    content.Children.Add(scroll);
    caption=new TextBlock { Text=name, FontFamily=new FontFamily("Segoe UI"), FontSize=19, Foreground=Brushes.White, HorizontalAlignment=HorizontalAlignment.Center, VerticalAlignment=VerticalAlignment.Center };
    PaintLabel();
    Grid.SetRow(caption,1); frame.Children.Add(caption);
    // An explicit resize handle works with transparent borderless windows.
-   System.Windows.Controls.Primitives.Thumb grip=new System.Windows.Controls.Primitives.Thumb { Width=30, Height=12, HorizontalAlignment=HorizontalAlignment.Right, VerticalAlignment=VerticalAlignment.Bottom, Cursor=Cursors.SizeNWSE, Opacity=.65, ToolTip="Изменить размер папки" };
+   System.Windows.Controls.Primitives.Thumb grip=new System.Windows.Controls.Primitives.Thumb { Width=30, Height=12, HorizontalAlignment=HorizontalAlignment.Right, VerticalAlignment=VerticalAlignment.Bottom, Margin=new Thickness(0,0,2,2), Cursor=Cursors.SizeNWSE, Opacity=.65, ToolTip="Изменить размер папки" };
    grip.SetResourceReference(Control.ForegroundProperty,"PanelHandle");
-   resizeHandle=grip; Grid.SetRow(grip,1); grip.Template=GripTemplate(); content.Children.Add(grip);
+   resizeHandle=grip;  grip.Template=GripTemplate(); content.Children.Add(grip);
    var moveDots=new Canvas {Width=12,Height=10,HorizontalAlignment=HorizontalAlignment.Center,VerticalAlignment=VerticalAlignment.Center};
    for(int y=0;y<3;y++)for(int x=0;x<2;x++) {var dot=new System.Windows.Shapes.Ellipse {Width=2,Height=2};dot.SetResourceReference(System.Windows.Shapes.Shape.FillProperty,"PanelHandle");Canvas.SetLeft(dot,3+x*4);Canvas.SetTop(dot,1+y*3);moveDots.Children.Add(dot);}
-   var moveHandle=new Border {Child=moveDots,Width=48,Height=12,Background=Brushes.Transparent,HorizontalAlignment=HorizontalAlignment.Center,VerticalAlignment=VerticalAlignment.Center,Cursor=Cursors.SizeAll,ToolTip="Перетащить папку"};
-   Grid.SetRow(moveHandle,1); content.Children.Add(moveHandle);
+   var moveHandle=new Border {Child=moveDots,Width=48,Height=12,Background=Brushes.Transparent,HorizontalAlignment=HorizontalAlignment.Center,VerticalAlignment=VerticalAlignment.Bottom,Margin=new Thickness(0,0,0,2),Cursor=Cursors.SizeAll,ToolTip="Перетащить папку"};
+    content.Children.Add(moveHandle);
    AttachDrag(moveHandle);
    moveMarker=moveHandle;MouseEnter+=(s,e)=>UpdateHandles();MouseLeave+=(s,e)=>UpdateHandles();UpdateHandles();
    Action undoSize=null; double dragW=0,dragH=0; Point dragOrigin=new Point();
@@ -380,27 +393,43 @@ namespace GridNest {
    card.PreviewDragOver+=(s,e)=> { e.Effects=e.Data.GetDataPresent(DataFormats.FileDrop)?(storeFiles||e.Data.GetDataPresent(InternalDrag)||((string[])e.Data.GetData(DataFormats.FileDrop)).All(p=>IsDesktopItem(p)&&IsShortcut(p))?DragDropEffects.Move:DragDropEffects.Copy):DragDropEffects.None; e.Handled=true; };
    card.Drop+=DropFiles;
    ContextMenu menu=new ContextMenu();
-   Add(menu,"Открыть папку — добавить ярлыки",()=>Open(folder));
-   Add(menu,"Обновить значки",()=> { cache.Clear(); Refresh(); }); menu.Items.Add(new Separator());
-   Add(menu,"Размер и оформление…",Settings);
-   Add(menu,"Цвет и прозрачность…",ColorSettings);
-   Add(menu,"Применить оформление к другим…",()=>ShareStyle());
-   Add(menu,"Скопировать оформление",()=>copiedStyle=CurrentStyle());
-   Add(menu,"Вставить оформление…",()=>ShareStyle(true));
-   Add(menu,"Настройки приложения…",Program.AppSettings);
-   var motion=new MenuItem { Header="Анимации значков и панелей", IsCheckable=true, IsChecked=animations };
-   animationMenu=motion;
-   motion.Click+=(s,e)=> { animations=motion.IsChecked; Refresh(); Save(); }; menu.Items.Add(motion);
-   Add(menu,"Переименовать папку…",RenameFolder);
-   Add(menu,"Создать папку…",Program.CreateFolder);
-   Add(menu,"Убрать папку в архив…",()=> { if(MessageBox.Show("Убрать папку «"+name+"» с рабочего стола?\nВсё содержимое сохранится в архиве GridNest\\.archive.","Убрать папку",MessageBoxButton.YesNo,MessageBoxImage.Question,MessageBoxResult.No)==MessageBoxResult.Yes) { try { Archive(); } catch(Exception ex) { MessageBox.Show(ex.Message,"Не удалось убрать папку"); } } });
-   Add(menu,"Поиск по всем папкам… (Ctrl+F)",Program.Search);
-   Add(menu,"Выровнять все папки по сетке",()=>Program.ArrangePanels());
-   Add(menu,"Показывать названия значков",()=> { labels=!labels;if(!SetGrid(columns,rows)) {labels=!labels;return;}Refresh();Save(); });
-   Add(menu,"Поверх остальных окон",()=> { Topmost=!Topmost; Save(); });
-   Add(menu,"Помощь",()=>Open(Path.Combine(Program.Home,"README.txt")));
+   Add(menu,"Открыть папку",()=>Open(folder));
+   var search=Add(menu,"Поиск…",Program.Search);search.InputGestureText="Ctrl+F";
    menu.Items.Add(new Separator());
-   Add(menu,"Закрыть все панели",()=>Application.Current.Shutdown());
+   var folderMenu=new MenuItem {Header="Папка"};menu.Items.Add(folderMenu);
+   Add(folderMenu,"Переименовать…",RenameFolder);
+   Add(folderMenu,"Создать новую…",Program.CreateFolder);
+   Add(folderMenu,"Обновить значки",()=> {cache.Clear();Refresh();});
+   folderMenu.Items.Add(new Separator());
+   var removeMenu=new MenuItem {Header="Убрать папку"};folderMenu.Items.Add(removeMenu);
+   Add(removeMenu,"На рабочий стол…",RemoveToDesktop);
+   Add(removeMenu,"В архив…",()=> {
+    if(MessageBox.Show("Убрать папку «"+name+"» с рабочего стола?\nСодержимое сохранится в архиве GridNest\\.archive.","Убрать папку",MessageBoxButton.YesNo,MessageBoxImage.Question,MessageBoxResult.No)==MessageBoxResult.Yes) {
+     try {Archive();}catch(Exception ex) {MessageBox.Show(ex.Message,"Не удалось убрать папку");}
+    }
+   });
+   var appearanceMenu=new MenuItem {Header="Оформление"};menu.Items.Add(appearanceMenu);
+   Add(appearanceMenu,"Настроить папку…",Settings);
+   Add(appearanceMenu,"Цвет и прозрачность…",ColorSettings);
+   appearanceMenu.Items.Add(new Separator());
+   Add(appearanceMenu,"Применить к другим…",()=>ShareStyle());
+   Add(appearanceMenu,"Скопировать",()=>copiedStyle=CurrentStyle());
+   var paste=Add(appearanceMenu,"Вставить…",()=>ShareStyle(true));
+   appearanceMenu.Items.Add(new Separator());
+   var names=new MenuItem {Header="Названия значков",IsCheckable=true};appearanceMenu.Items.Add(names);
+   names.Click+=(s,e)=> {bool previous=labels;labels=names.IsChecked;if(!SetGrid(columns,rows))labels=previous;names.IsChecked=labels;Refresh();Save();};
+   var motion=new MenuItem {Header="Анимации",IsCheckable=true,IsChecked=animations};
+   animationMenu=motion;appearanceMenu.Items.Add(motion);
+   motion.Click+=(s,e)=> {animations=motion.IsChecked;UpdateOutline();Refresh();Save();};
+   var placementMenu=new MenuItem {Header="Размещение"};menu.Items.Add(placementMenu);
+   Add(placementMenu,"Выровнять все по сетке",Program.ArrangePanels);
+   var top=new MenuItem {Header="Поверх окон",IsCheckable=true};placementMenu.Items.Add(top);
+   top.Click+=(s,e)=> {Topmost=top.IsChecked;Save();};
+   menu.Items.Add(new Separator());
+   Add(menu,"Настройки приложения…",Program.AppSettings);
+   Add(menu,"Помощь",()=>Open(Path.Combine(Program.Home,"README.txt")));
+   Add(menu,"Выход",()=>Application.Current.Shutdown());
+   menu.Opened+=(s,e)=> {names.IsChecked=labels;motion.IsChecked=animations;top.IsChecked=Topmost;paste.IsEnabled=copiedStyle!=null;};
    frame.ContextMenu=menu;
    PreviewMouseWheel+=(s,e)=> { if((Keyboard.Modifiers&ModifierKeys.Control)!=0) { SetIconSize(iconSize+(e.Delta>0?8:-8)); e.Handled=true; } };
    PreviewKeyDown+=(s,e)=> { if(e.Key==Key.Z&&Keyboard.Modifiers==ModifierKeys.Control) {Program.Undo();e.Handled=true;} else if(e.Key==Key.F&&(Keyboard.Modifiers&ModifierKeys.Control)!=0) { Program.Search(); e.Handled=true; } };
@@ -408,20 +437,22 @@ namespace GridNest {
    watcher=new FileSystemWatcher(folder) { NotifyFilter=NotifyFilters.FileName|NotifyFilters.DirectoryName|NotifyFilters.LastWrite, EnableRaisingEvents=true };
    FileSystemEventHandler changed=(s,e)=>Dispatcher.BeginInvoke(new Action(()=> { debounce.Stop(); debounce.Start(); }));
    watcher.Created+=changed; watcher.Deleted+=changed; watcher.Changed+=changed; watcher.Renamed+=(s,e)=>changed(s,e);
-   Loaded+=(s,e)=> { loaded=true; LoadOrder(); SetGrid(columns,rows); Clamp(); AlignPosition(); Refresh(); Save(); Reveal(); };
+   Loaded+=(s,e)=> { LoadOrder(); SetGrid(columns,rows); loaded=true; Clamp(); AlignPosition(); Refresh();UpdateOutline(); Save(); Reveal(); };
    IsVisibleChanged+=(s,e)=> { if(IsVisible&&loaded)Reveal(); };
    SizeChanged+=(s,e)=> { if(loaded&&!snapping) { SnapSize(Width,Height); Save(); } };
-   Closed+=(s,e)=> { Save(); watcher.Dispose(); debounce.Stop(); };
+   LocationChanged+=(s,e)=>PositionOuterGlow();SizeChanged+=(s,e)=>PositionOuterGlow();
+   IsVisibleChanged+=(s,e)=>UpdateOuterGlow();
+   Closed+=(s,e)=> {if(haloWindow!=null)haloWindow.Close();Save();watcher.Dispose();debounce.Stop();};
   }
   static ControlTemplate GripTemplate() {
    return (ControlTemplate)System.Windows.Markup.XamlReader.Parse("<ControlTemplate xmlns='http://schemas.microsoft.com/winfx/2006/xaml/presentation' TargetType='Thumb'><Grid Background='Transparent'><Path Data='M 4,10 L 11,3 M 9,10 L 14,5' Stroke='{TemplateBinding Foreground}' StrokeThickness='1.6' StrokeStartLineCap='Round' StrokeEndLineCap='Round' HorizontalAlignment='Center' VerticalAlignment='Center'/></Grid></ControlTemplate>");
   }
-  static void Add(ContextMenu m,string text,Action action) { var item=new MenuItem { Header=text }; item.Click+=(s,e)=>action(); m.Items.Add(item); }
+  static MenuItem Add(ItemsControl m,string text,Action action) { var item=new MenuItem { Header=text }; item.Click+=(s,e)=>action(); m.Items.Add(item);return item; }
   void Load() {
-   try { var x=XElement.Load(config); Width=Get(x,"Width",Width); Height=Get(x,"Height",Height); Left=Get(x,"Left",Left); Top=Get(x,"Top",Top); iconSize=(int)Math.Max(28,Math.Min(128,Get(x,"IconSize",64))); alpha=Math.Max(0,Math.Min(1,Get(x,"Opacity",.84))); darkCaption=(bool?)x.Attribute("DarkCaption")??false; labels=(string)x.Attribute("Labels")=="true"; Topmost=(string)x.Attribute("Topmost")=="true"; columns=(int)Get(x,"Columns",Math.Round((Width-50)/CellWidth)); rows=(int)Get(x,"Rows",Math.Round((Height-66)/CellHeight)); } catch {}
+   try { var x=XElement.Load(config); Width=Get(x,"Width",Width); Height=Get(x,"Height",Height); Left=Get(x,"Left",Left); Top=Get(x,"Top",Top); iconSize=(int)Math.Max(28,Math.Min(128,Get(x,"IconSize",64))); alpha=Math.Max(0,Math.Min(1,Get(x,"Opacity",.84))); darkCaption=(bool?)x.Attribute("DarkCaption")??false; labels=(string)x.Attribute("Labels")=="true"; Topmost=(string)x.Attribute("Topmost")=="true"; columns=(int)Get(x,"Columns",Math.Round((Width-32)/CellWidth)); rows=(int)Get(x,"Rows",Math.Round((Height-66)/CellHeight)); } catch {}
    try {var x=XElement.Load(config);iconTheme=ValidIconTheme((string)x.Attribute("IconTheme"));}catch{}
    try { var x=XElement.Load(config); if(x.Attribute("Background")!=null)background=ParseColor((string)x.Attribute("Background")); } catch {}
-   try {var x=XElement.Load(config);outlineColor=ParseColor((string)x.Attribute("OutlineColor")??"#8AE5D5");outlineThickness=Math.Max(0,Math.Min(8,Get(x,"OutlineThickness",0)));outlineGlow=Math.Max(0,Math.Min(100,Get(x,"OutlineGlow",0)));}catch{}
+   try {var x=XElement.Load(config);glowPulse=(bool?)x.Attribute("GlowPulse")??false;glowMode=ValidGlowMode((string)x.Attribute("GlowMode"));outlineColor=ParseColor((string)x.Attribute("OutlineColor")??"#8AE5D5");outlineThickness=Math.Max(0,Math.Min(8,Get(x,"OutlineThickness",0)));outlineGlow=Math.Max(0,Math.Min(100,Get(x,"OutlineGlow",0)));}catch{}
    try { animations=(string)XElement.Load(config).Attribute("Animations")!="false"; } catch {}
    try { storeFiles=(string)XElement.Load(config).Attribute("Mode")!="Shortcuts"; } catch {}
    Width=Math.Max(MinWidth,Width); Height=Math.Max(MinHeight,Height);
@@ -429,9 +460,9 @@ namespace GridNest {
   static double Get(XElement e,string key,double d) { double v; return double.TryParse((string)e.Attribute(key),System.Globalization.NumberStyles.Float,System.Globalization.CultureInfo.InvariantCulture,out v)&&!double.IsNaN(v)&&!double.IsInfinity(v)?v:d; }
   bool SetGrid(int c,int r,bool relocate=true) {
    var a=Program.Area(Left,Top);
-   int nextColumns=Math.Max(1,Math.Min(c,Math.Max(1,(int)Math.Floor((a.Width-50)/CellWidth))));
-   int nextRows=Math.Max(1,Math.Min(r,Math.Max(1,(int)Math.Floor((a.Height-78)/CellHeight))));
-   double width=50+nextColumns*CellWidth,height=78+nextRows*CellHeight;Point position=new Point(Left,Top);
+   int nextColumns=Math.Max(1,Math.Min(c,Math.Max(1,(int)Math.Floor((a.Width-32)/CellWidth))));
+   int nextRows=Math.Max(1,Math.Min(r,Math.Max(1,(int)Math.Floor((a.Height-70)/CellHeight))));
+   double width=32+nextColumns*CellWidth,height=70+nextRows*CellHeight;Point position=new Point(Left,Top);
    if(Program.Locked&&loaded&&(nextColumns!=columns||nextRows!=rows||Math.Abs(width-Width)>.01||Math.Abs(height-Height)>.01))return false;
    if(Program.LayoutReady&&!Program.FindPlacement(this,Left,Top,width,height,relocate,out position))return false;
    columns=nextColumns;rows=nextRows;
@@ -442,7 +473,7 @@ namespace GridNest {
   }
   public bool PrepareGrid() {return SetGrid(columns,rows);}
   public bool TestCollisionGuard() {double w=Width,h=Height;return !SetGrid(100,100,false)&&Width==w&&Height==h;}
-  void SnapSize(double w,double h) { SetGrid((int)Math.Round((w-50)/CellWidth),(int)Math.Round((h-78)/CellHeight),false); }
+  void SnapSize(double w,double h) { SetGrid((int)Math.Round((w-32)/CellWidth),(int)Math.Round((h-70)/CellHeight),false); }
   void Clamp() { var a=Program.Area(Left,Top); SetGrid(columns,rows); Left=Math.Max(a.Left,Math.Min(Left,a.Right-Width)); Top=Math.Max(a.Top,Math.Min(Top,a.Bottom-Height)); }
   public void AlignPosition() {
    if(Program.LayoutReady) {Point point;if(Program.FindPlacement(this,Left,Top,Width,Height,true,out point)) {Left=point.X;Top=point.Y;}return;}
@@ -498,7 +529,7 @@ namespace GridNest {
   }
   public void Save() {
    if(!loaded||retired)return;
-   try { new XElement("Panel",new XAttribute("Mode",storeFiles?"Files":"Shortcuts"),new XAttribute("Columns",columns),new XAttribute("Rows",rows),new XAttribute("Width",Width),new XAttribute("Height",Height),new XAttribute("Left",Left),new XAttribute("Top",Top),new XAttribute("IconTheme",iconTheme),new XAttribute("IconSize",iconSize),new XAttribute("Opacity",backdropPreview?committedAlpha:alpha),new XAttribute("OutlineColor",ColorHex(backdropPreview?committedOutlineColor:outlineColor)),new XAttribute("OutlineThickness",backdropPreview?committedOutlineThickness:outlineThickness),new XAttribute("OutlineGlow",backdropPreview?committedOutlineGlow:outlineGlow),new XAttribute("Background",ColorHex(backdropPreview?committedBackground:background)),new XAttribute("Animations",animations?"true":"false"),new XAttribute("DarkCaption",darkCaption),new XAttribute("Labels",labels?"true":"false"),new XAttribute("Topmost",Topmost?"true":"false")).Save(config); } catch {}
+   try { new XElement("Panel",new XAttribute("Mode",storeFiles?"Files":"Shortcuts"),new XAttribute("Columns",columns),new XAttribute("Rows",rows),new XAttribute("Width",Width),new XAttribute("Height",Height),new XAttribute("Left",Left),new XAttribute("Top",Top),new XAttribute("IconTheme",iconTheme),new XAttribute("IconSize",iconSize),new XAttribute("Opacity",backdropPreview?committedAlpha:alpha),new XAttribute("GlowPulse",backdropPreview?committedGlowPulse:glowPulse),new XAttribute("GlowMode",backdropPreview?committedGlowMode:glowMode),new XAttribute("OutlineColor",ColorHex(backdropPreview?committedOutlineColor:outlineColor)),new XAttribute("OutlineThickness",backdropPreview?committedOutlineThickness:outlineThickness),new XAttribute("OutlineGlow",backdropPreview?committedOutlineGlow:outlineGlow),new XAttribute("Background",ColorHex(backdropPreview?committedBackground:background)),new XAttribute("Animations",animations?"true":"false"),new XAttribute("DarkCaption",darkCaption),new XAttribute("Labels",labels?"true":"false"),new XAttribute("Topmost",Topmost?"true":"false")).Save(config); } catch {}
   }
   bool Motion { get { return animations&&SystemParameters.ClientAreaAnimation; } }
   void Fade(UIElement target,double opacity,int ms) {
@@ -552,7 +583,7 @@ namespace GridNest {
     var scale=new ScaleTransform(1,1); var lift=new TranslateTransform(); var transform=new TransformGroup(); transform.Children.Add(scale); transform.Children.Add(lift); image.RenderTransform=transform;
     cell.MouseEnter+=(s,e)=>IconMotion(scale,lift,1.08,-1); cell.MouseLeave+=(s,e)=>IconMotion(scale,lift,1,0);
     RenderOptions.SetBitmapScalingMode(image,BitmapScalingMode.HighQuality); cell.Children.Add(IconTile(image,iconTheme,slot,iconSize));
-    if(labels) cell.Children.Add(new TextBlock { Text=IsShortcut(path)?Path.GetFileNameWithoutExtension(path):Path.GetFileName(path), FontSize=11, Foreground=Brushes.White, TextAlignment=TextAlignment.Center, TextTrimming=TextTrimming.CharacterEllipsis, Margin=new Thickness(0,4,0,0) });
+    if(labels) cell.Children.Add(new TextBlock { Text=IsShortcut(path)?Path.GetFileNameWithoutExtension(path):Path.GetFileName(path), FontSize=11, Foreground=Brushes.White, TextAlignment=TextAlignment.Center, TextTrimming=TextTrimming.CharacterEllipsis, Height=16,LineHeight=16,Margin=new Thickness(0,0,0,8) });
     Point start=new Point(); bool pressed=false,dragged=false;
     cell.PreviewMouseLeftButtonDown+=(s,e)=> { start=e.GetPosition(this); pressed=true; dragged=false; cell.Focus(); cell.CaptureMouse(); IconMotion(scale,lift,.94,1); e.Handled=true; };
     cell.MouseMove+=(s,e)=> {
@@ -645,7 +676,7 @@ namespace GridNest {
    return dest;
   }
   void AskName(string title,string value,Action<string> apply) {
-   var w=new Window { Title=title, Width=420, Height=260, ResizeMode=ResizeMode.NoResize, WindowStartupLocation=WindowStartupLocation.CenterOwner, Owner=this, ShowInTaskbar=false };
+   var w=new Window { Title=title, Width=420, Height=220, ResizeMode=ResizeMode.NoResize, WindowStartupLocation=WindowStartupLocation.CenterOwner, Owner=this, ShowInTaskbar=false };
    var layout=new SettingsLayout(w);var sp=layout.Body;
    var input=new TextBox { Text=value, Margin=new Thickness(0,0,0,14) }; sp.Children.Add(input);
    var ok=new Button { Content="Переименовать", IsDefault=true, Padding=new Thickness(10,6,10,6) }; SettingsLayout.Buttons(layout.Actions,w,ok);
@@ -654,6 +685,52 @@ namespace GridNest {
   }
   void RenameItem(string path) { AskName("Переименовать значок",Directory.Exists(path)?Path.GetFileName(path):Path.GetFileNameWithoutExtension(path),value=> { string dest=RenamePath(path,value); for(int i=0;i<order.Count;i++)if(order[i].Equals(Path.GetFileName(path),StringComparison.OrdinalIgnoreCase))order[i]=Path.GetFileName(dest); SaveOrder(); cache.Clear(); Refresh(); }); }
   public static string ValidateFolderName(string value) { if(value.StartsWith("."))throw new IOException("Имя папки не должно начинаться с точки."); return RenamedPath(Path.Combine(Program.Data,"Folder"),value); }
+  string[] TransferEntries() {
+   return Directory.GetFileSystemEntries(folder).Where(path=>
+    !path.Equals(OrderFile,StringComparison.OrdinalIgnoreCase)&&
+    !Path.GetFileName(path).Equals("desktop.ini",StringComparison.OrdinalIgnoreCase)).ToArray();
+  }
+  List<string> MoveContentsOut(string destination) {
+   var errors=new List<string>();
+   string target=Path.GetFullPath(destination).TrimEnd(Path.DirectorySeparatorChar);
+   string sourceFolder=Path.GetFullPath(folder).TrimEnd(Path.DirectorySeparatorChar);
+   if(target.Equals(sourceFolder,StringComparison.OrdinalIgnoreCase)||
+    target.StartsWith(sourceFolder+Path.DirectorySeparatorChar,StringComparison.OrdinalIgnoreCase))
+    throw new IOException("Место назначения должно находиться за пределами папки.");
+   Directory.CreateDirectory(target);
+   watcher.EnableRaisingEvents=false;
+   try {
+    foreach(string source in TransferEntries()) {
+     try {MoveEntry(source,Unique(Path.Combine(target,Path.GetFileName(source))));}
+     catch(Exception ex) {errors.Add(Path.GetFileName(source)+": "+ex.Message);}
+    }
+    cache.Clear();Refresh();SaveOrder();
+    if(errors.Count==0) {
+     if(TransferEntries().Length>0)errors.Add("В папке появились новые объекты. Повторите перенос.");
+     else {try {Archive();}catch(Exception ex) {errors.Add(ex.Message);}}
+    }
+   } finally {if(!retired)watcher.EnableRaisingEvents=true;}
+   return errors;
+  }
+  void RemoveToDesktop() {
+   var w=new Window {Title="Перенести на рабочий стол — GridNest",Width=460,Height=290,Owner=this,ShowInTaskbar=false,WindowStartupLocation=WindowStartupLocation.CenterOwner};
+   var layout=new SettingsLayout(w);
+   layout.Body.Children.Add(new TextBlock {Text="Убрать папку «"+name+"»?",TextWrapping=TextWrapping.Wrap,FontSize=17,Margin=new Thickness(0,0,0,12)});
+   SettingsLayout.Hint(layout.Body,"Ярлыки, файлы и вложенные папки будут перемещены на рабочий стол. При совпадении имён будет добавлен номер.");
+   var move=new Button {Content="На рабочий стол"};
+   SettingsLayout.Buttons(layout.Actions,w,move);
+   move.Click+=(s,e)=> {
+    move.IsEnabled=false;
+    try {
+     var errors=MoveContentsOut(Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory));
+     if(errors.Count==0) {if(w.IsVisible)w.Close();}
+     else MessageBox.Show(w,"Часть объектов осталась в папке. Можно повторить перенос."+Environment.NewLine+Environment.NewLine+string.Join(Environment.NewLine,errors),"Перенос не завершён");
+    } catch(Exception ex) {MessageBox.Show(w,ex.Message,"Не удалось перенести");}
+    finally {if(w.IsVisible)move.IsEnabled=true;}
+   };
+   w.ShowDialog();
+  }
+
   public string Archive() {
    Save(); SaveOrder();
    string entry=Path.Combine(Program.Data,".archive",DateTime.Now.ToString("yyyyMMdd-HHmmss")+"-"+Guid.NewGuid().ToString("N"));
@@ -691,6 +768,59 @@ namespace GridNest {
   bool outlineColorValid=true;
   Color committedOutlineColor;
   double committedOutlineThickness,committedOutlineGlow;
+  string glowMode="Inside",committedGlowMode;
+  bool glowPulse,committedGlowPulse;
+  System.Windows.Media.Effects.DropShadowEffect GlowEffect() {
+   double strength=outlineGlow/100;
+   var effect=new System.Windows.Media.Effects.DropShadowEffect {Color=outlineColor,BlurRadius=12+outlineGlow*.15,ShadowDepth=0,Opacity=strength};
+   if(glowPulse&&Motion)effect.BeginAnimation(System.Windows.Media.Effects.DropShadowEffect.OpacityProperty,
+    new DoubleAnimation(strength*.35,strength,TimeSpan.FromSeconds(1.1)) {
+     AutoReverse=true,RepeatBehavior=RepeatBehavior.Forever,EasingFunction=new SineEase {EasingMode=EasingMode.EaseInOut}
+    });
+   return effect;
+  }
+  Window haloWindow;
+  Grid haloFrame;
+  Border haloBorder;
+  const double HaloPadding=32;
+  static string ValidGlowMode(string value) {
+   return new[]{"Inside","Outside","Both"}.Contains(value)?value:"Inside";
+  }
+  [DllImport("user32.dll",EntryPoint="GetWindowLongW")]static extern int GetWindowStyle(IntPtr handle,int index);
+  [DllImport("user32.dll",EntryPoint="SetWindowLongW")]static extern int SetWindowStyle(IntPtr handle,int index,int value);
+  void PositionOuterGlow() {
+   if(haloWindow==null)return;
+   double bodyHeight=Math.Max(1,Height-38);
+   haloWindow.Left=Left-HaloPadding;haloWindow.Top=Top-HaloPadding;
+   haloWindow.Width=Width+HaloPadding*2;haloWindow.Height=bodyHeight+HaloPadding*2;
+   var bounds=new RectangleGeometry(new Rect(0,0,haloWindow.Width,haloWindow.Height));
+   var panel=new RectangleGeometry(new Rect(HaloPadding,HaloPadding,Width,bodyHeight),30,30);
+   haloFrame.Clip=glowMode=="Outside"?new CombinedGeometry(GeometryCombineMode.Exclude,bounds,panel):(Geometry)bounds;
+  }
+  void UpdateOuterGlow() {
+   bool show=loaded&&IsVisible&&!retired&&outlineThickness>0&&outlineGlow>0&&glowMode!="Inside";
+   if(!show) {if(haloWindow!=null)haloWindow.Hide();return;}
+   if(haloWindow==null) {
+    haloBorder=new Border {CornerRadius=new CornerRadius(30),Margin=new Thickness(HaloPadding),IsHitTestVisible=false};
+    haloFrame=new Grid {IsHitTestVisible=false};haloFrame.Children.Add(haloBorder);
+    haloWindow=new Window {Owner=this,WindowStyle=WindowStyle.None,ResizeMode=ResizeMode.NoResize,
+     AllowsTransparency=true,Background=Brushes.Transparent,ShowInTaskbar=false,ShowActivated=false,
+     Focusable=false,IsHitTestVisible=false,Content=haloFrame};
+    haloWindow.SetBinding(OpacityProperty,new System.Windows.Data.Binding("Opacity") {Source=this});
+    haloWindow.SourceInitialized+=(s,e)=> {
+     var handle=new WindowInteropHelper(haloWindow).Handle;
+     // Layered decoration passes mouse input through and never activates.
+     SetWindowStyle(handle,-20,GetWindowStyle(handle,-20)|0x20|0x08000000|0x80);
+    };
+    haloWindow.Closed+=(s,e)=>haloWindow=null;
+   }
+   haloBorder.BorderBrush=new SolidColorBrush(outlineColor);
+   haloBorder.BorderThickness=new Thickness(outlineThickness);
+   haloBorder.Effect=GlowEffect();
+   PositionOuterGlow();
+   if(!haloWindow.IsVisible)haloWindow.Show();
+  }
+
   void UpdateOutline() {
    if(outlineLayer==null)return;
    outlineLayer.BorderBrush=new SolidColorBrush(outlineColor);
@@ -698,12 +828,17 @@ namespace GridNest {
    outlineLayer.Visibility=outlineThickness>0?Visibility.Visible:Visibility.Collapsed;
    glowLayer.BorderBrush=new SolidColorBrush(outlineColor);
    glowLayer.BorderThickness=new Thickness(outlineThickness);
-   glowLayer.Visibility=outlineThickness>0&&outlineGlow>0?Visibility.Visible:Visibility.Collapsed;
-   glowLayer.Effect=outlineGlow>0?new System.Windows.Media.Effects.DropShadowEffect {
-    Color=outlineColor,BlurRadius=12+outlineGlow*.15,ShadowDepth=0,Opacity=outlineGlow/100
-   }:null;
+   glowLayer.Visibility=outlineThickness>0&&outlineGlow>0&&glowMode=="Inside"?Visibility.Visible:Visibility.Collapsed;
+   glowLayer.Effect=outlineGlow>0?GlowEffect():null;
+   UpdateOuterGlow();
   }
   void OutlineEditor(StackPanel parent) {
+   parent.Children.Add(new TextBlock {Text="Направление свечения",Margin=new Thickness(0,0,0,6)});
+   var directions=new[]{"Inside","Outside","Both"};
+   var mode=new ComboBox {Name="GlowDirection",ItemsSource=new[]{"Внутрь","Наружу","С обеих сторон"},SelectedIndex=Array.IndexOf(directions,glowMode),Margin=new Thickness(0,0,0,14)};
+   parent.Children.Add(mode);mode.SelectionChanged+=(s,e)=> {glowMode=directions[mode.SelectedIndex];UpdateOutline();};
+   var pulse=new CheckBox {Name="GlowPulse",Content="Пульсация свечения",IsChecked=glowPulse,Margin=new Thickness(0,0,0,12)};
+   parent.Children.Add(pulse);pulse.Click+=(s,e)=> {glowPulse=pulse.IsChecked==true;UpdateOutline();};
    parent.Children.Add(new TextBlock {Text="Цвет обводки",Margin=new Thickness(0,0,0,6)});
    var input=new TextBox {Name="OutlineColor",Text=ColorHex(outlineColor),ToolTip="Цвет в формате #RRGGBB"};
    parent.Children.Add(input);
@@ -754,7 +889,7 @@ namespace GridNest {
    } catch {return source;}
   }
   FrameworkElement IconTile(Image image,string theme,int index,double size) {
-   var grid=new Grid {Width=size,Height=size,Margin=new Thickness(0,4,0,0),HorizontalAlignment=HorizontalAlignment.Center};
+   var grid=new Grid {Width=size,Height=size,Margin=new Thickness(0,8,0,labels?4:8),HorizontalAlignment=HorizontalAlignment.Center};
    bool pastel=theme=="Pastel";
    if(theme!="Original") {
     var colors=new[]{Color.FromRgb(235,215,247),Color.FromRgb(202,235,223),Color.FromRgb(250,224,198),Color.FromRgb(209,224,250)};
@@ -792,6 +927,8 @@ namespace GridNest {
   static string ValidIconTheme(string value) {return new[]{"Original","Glass","Pastel"}.Contains(value)?value:"Glass";}
   sealed class FolderStyle {
    public string IconTheme="Glass";
+   public string GlowMode="Inside";
+   public bool GlowPulse;
    public Color OutlineColor=Color.FromRgb(138,229,213);
    public double OutlineThickness,OutlineGlow;
    public Color Background;
@@ -799,13 +936,13 @@ namespace GridNest {
    public bool DarkText, Labels, Animations;
    public int IconSize, Columns, Rows;
    public XElement ToXml() {
-    return new XElement("Style",new XAttribute("OutlineColor",ColorHex(OutlineColor)),new XAttribute("OutlineThickness",OutlineThickness),new XAttribute("OutlineGlow",OutlineGlow),new XAttribute("Background",ColorHex(Background)),
+    return new XElement("Style",new XAttribute("GlowPulse",GlowPulse),new XAttribute("GlowMode",GlowMode),new XAttribute("OutlineColor",ColorHex(OutlineColor)),new XAttribute("OutlineThickness",OutlineThickness),new XAttribute("OutlineGlow",OutlineGlow),new XAttribute("Background",ColorHex(Background)),
      new XAttribute("Opacity",Opacity),new XAttribute("DarkText",DarkText),
      new XAttribute("Labels",Labels),new XAttribute("Animations",Animations),
      new XAttribute("IconTheme",IconTheme),new XAttribute("IconSize",IconSize),new XAttribute("Columns",Columns),new XAttribute("Rows",Rows));
    }
    public static FolderStyle Read(XElement x) {
-    return new FolderStyle { OutlineColor=ParseColor((string)x.Attribute("OutlineColor")??"#8AE5D5"),OutlineThickness=Math.Max(0,Math.Min(8,Get(x,"OutlineThickness",0))),OutlineGlow=Math.Max(0,Math.Min(100,Get(x,"OutlineGlow",0))),Background=ParseColor((string)x.Attribute("Background")),IconTheme=ValidIconTheme((string)x.Attribute("IconTheme")),
+    return new FolderStyle { GlowPulse=(bool?)x.Attribute("GlowPulse")??false,GlowMode=ValidGlowMode((string)x.Attribute("GlowMode")),OutlineColor=ParseColor((string)x.Attribute("OutlineColor")??"#8AE5D5"),OutlineThickness=Math.Max(0,Math.Min(8,Get(x,"OutlineThickness",0))),OutlineGlow=Math.Max(0,Math.Min(100,Get(x,"OutlineGlow",0))),Background=ParseColor((string)x.Attribute("Background")),IconTheme=ValidIconTheme((string)x.Attribute("IconTheme")),
      Opacity=Math.Max(0,Math.Min(1,(double)x.Attribute("Opacity"))),
      DarkText=(bool)x.Attribute("DarkText"),Labels=(bool)x.Attribute("Labels"),
      Animations=(bool)x.Attribute("Animations"),
@@ -816,7 +953,7 @@ namespace GridNest {
   }
   static FolderStyle copiedStyle;
   FolderStyle CurrentStyle() {
-   return new FolderStyle {OutlineColor=outlineColor,OutlineThickness=outlineThickness,OutlineGlow=outlineGlow,IconTheme=iconTheme,Background=background,Opacity=alpha,DarkText=darkCaption,
+   return new FolderStyle {GlowPulse=glowPulse,GlowMode=glowMode,OutlineColor=outlineColor,OutlineThickness=outlineThickness,OutlineGlow=outlineGlow,IconTheme=iconTheme,Background=background,Opacity=alpha,DarkText=darkCaption,
     Labels=labels,Animations=animations,IconSize=iconSize,Columns=columns,Rows=rows };
   }
   void RedrawStyle() {
@@ -824,12 +961,12 @@ namespace GridNest {
    cache.Clear();Refresh();Save();
   }
   void RestoreStyle(FolderStyle style,Point position) {
-   outlineColor=style.OutlineColor;outlineThickness=style.OutlineThickness;outlineGlow=style.OutlineGlow;
+   glowPulse=style.GlowPulse;glowMode=style.GlowMode;outlineColor=style.OutlineColor;outlineThickness=style.OutlineThickness;outlineGlow=style.OutlineGlow;
    background=style.Background;alpha=style.Opacity;darkCaption=style.DarkText;iconTheme=style.IconTheme;
    labels=style.Labels;animations=style.Animations;iconSize=style.IconSize;
    columns=style.Columns;rows=style.Rows;Left=position.X;Top=position.Y;
    snapping=true;
-   try { Width=50+columns*CellWidth;Height=78+rows*CellHeight;icons.Width=columns*CellWidth; }
+   try { Width=32+columns*CellWidth;Height=70+rows*CellHeight;icons.Width=columns*CellWidth; }
    finally { snapping=false; }
    RedrawStyle();
   }
@@ -843,7 +980,7 @@ namespace GridNest {
      RestoreStyle(previous,position);layoutFits=false;
     }
    }
-   if(outline) {outlineColor=style.OutlineColor;outlineThickness=style.OutlineThickness;outlineGlow=style.OutlineGlow;}
+   if(outline) {glowPulse=style.GlowPulse;glowMode=style.GlowMode;outlineColor=style.OutlineColor;outlineThickness=style.OutlineThickness;outlineGlow=style.OutlineGlow;}
    if(transparency??appearance)alpha=style.Opacity;
    if(appearance) {background=style.Background;darkCaption=style.DarkText;iconTheme=style.IconTheme;}
    if(items)animations=style.Animations;
@@ -853,7 +990,7 @@ namespace GridNest {
    if(File.Exists(config))return;
    try {
     var style=FolderStyle.Read(XElement.Load(Path.Combine(Program.Home,"default-style.xml")));
-    outlineColor=style.OutlineColor;outlineThickness=style.OutlineThickness;outlineGlow=style.OutlineGlow;
+    glowPulse=style.GlowPulse;glowMode=style.GlowMode;outlineColor=style.OutlineColor;outlineThickness=style.OutlineThickness;outlineGlow=style.OutlineGlow;
    background=style.Background;alpha=style.Opacity;darkCaption=style.DarkText;iconTheme=style.IconTheme;
     labels=style.Labels;animations=style.Animations;iconSize=style.IconSize;
     columns=style.Columns;rows=style.Rows;
@@ -863,13 +1000,13 @@ namespace GridNest {
    if(paste&&copiedStyle==null) {MessageBox.Show("Сначала скопируйте оформление папки.");return;}
    var source=paste?copiedStyle:CurrentStyle();
    var w=new Window {Title=paste?"Вставить оформление — GridNest":"Применить к другим папкам — GridNest",
-    Width=520,Height=Math.Min(780,Program.Area(Left,Top).Height-40),Owner=this,ShowInTaskbar=false,
+    Width=520,Height=Math.Min(580,Program.Area(Left,Top).Height-40),Owner=this,ShowInTaskbar=false,
     WindowStartupLocation=WindowStartupLocation.CenterOwner};
    var layout=new SettingsLayout(w);
    var checks=new Dictionary<PanelWindow,CheckBox>();
    CheckBox all=null;
    if(!paste) {
-    var recipients=SettingsLayout.Section(layout.Body,"Папки");
+    var recipients=layout.Page("Папки");
     SettingsLayout.Hint(recipients,"Оформление папки «"+name+"»");
     all=new CheckBox {Content="Выбрать все",Name="SelectAllFolders",Margin=new Thickness(0,0,0,10)};
     recipients.Children.Add(all);
@@ -878,7 +1015,7 @@ namespace GridNest {
      var check=new CheckBox {Content=panel.FolderName,ToolTip=panel.FolderName};
      checks.Add(panel,check);targets.Children.Add(check);
     }
-    var list=new ScrollViewer {Name="FolderRecipients",Content=targets,Height=160,
+    var list=new ScrollViewer {Name="FolderRecipients",Content=targets,Height=260,
      HorizontalScrollBarVisibility=ScrollBarVisibility.Disabled,VerticalScrollBarVisibility=ScrollBarVisibility.Auto};
     var listFrame=new Border {Child=list,CornerRadius=new CornerRadius(7),BorderThickness=new Thickness(1)};
     listFrame.SetResourceReference(Border.BorderBrushProperty,"SettingsLine");
@@ -888,14 +1025,14 @@ namespace GridNest {
     checks.Add(this,new CheckBox {IsChecked=true});
     SettingsLayout.Hint(layout.Body,"Оформление будет применено к папке «"+name+"».");
    }
-   var options=SettingsLayout.Section(layout.Body,"Что применить");
+   var options=paste?layout.Body:layout.Page("Параметры");
    var appearance=new CheckBox {Name="ShareAppearance",Content="Стиль значков, цвет и название",IsChecked=true};
    var transparency=new CheckBox {Name="ShareTransparency",Content="Прозрачность подложки",IsChecked=true};
    var outline=new CheckBox {Name="ShareOutline",Content="Обводка и свечение",IsChecked=true};
    var items=new CheckBox {Content="Масштаб значков, подписи и анимации"};
    var dimensions=new CheckBox {Content="Число столбцов и рядов"};
    options.Children.Add(appearance);options.Children.Add(transparency);options.Children.Add(outline);options.Children.Add(items);options.Children.Add(dimensions);
-   var future=SettingsLayout.Section(layout.Body,"Новые папки");
+   var future=options;future.Children.Add(new Separator {Margin=new Thickness(0,12,0,12)});
    var defaults=new CheckBox {Name="SaveDefaultStyle",Content="Использовать выбранные параметры для новых папок"};
    future.Children.Add(defaults);
    var summary=new TextBlock {Margin=new Thickness(0,0,0,12),TextWrapping=TextWrapping.Wrap};
@@ -939,7 +1076,7 @@ namespace GridNest {
      var initial=new FolderStyle {Background=Color.FromRgb(44,46,55),Opacity=.84,IconSize=64,Columns=3,Rows=3,Animations=true};
      if(oldDefault!=null) {try {initial=FolderStyle.Read(XElement.Parse(oldDefault));}catch{}}
      if(appearance.IsChecked==true) {initial.IconTheme=source.IconTheme;initial.Background=source.Background;initial.DarkText=source.DarkText;}
-     if(outline.IsChecked==true) {initial.OutlineColor=source.OutlineColor;initial.OutlineThickness=source.OutlineThickness;initial.OutlineGlow=source.OutlineGlow;}
+     if(outline.IsChecked==true) {initial.GlowPulse=source.GlowPulse;initial.GlowMode=source.GlowMode;initial.OutlineColor=source.OutlineColor;initial.OutlineThickness=source.OutlineThickness;initial.OutlineGlow=source.OutlineGlow;}
      if(transparency.IsChecked==true)initial.Opacity=source.Opacity;
      if(items.IsChecked==true) {initial.IconSize=source.IconSize;initial.Labels=source.Labels;initial.Animations=source.Animations;}
      if(dimensions.IsChecked==true) {initial.Columns=source.Columns;initial.Rows=source.Rows;}
@@ -959,10 +1096,10 @@ namespace GridNest {
   Color committedBackground;
   double committedAlpha;
   void BeginBackdropPreview() {
-   committedBackground=background;committedAlpha=alpha;committedOutlineColor=outlineColor;committedOutlineThickness=outlineThickness;committedOutlineGlow=outlineGlow;backdropPreview=true;backdropColorValid=true;outlineColorValid=true;
+   committedBackground=background;committedAlpha=alpha;committedGlowPulse=glowPulse;committedGlowMode=glowMode;committedOutlineColor=outlineColor;committedOutlineThickness=outlineThickness;committedOutlineGlow=outlineGlow;backdropPreview=true;backdropColorValid=true;outlineColorValid=true;
   }
   void EndBackdropPreview(bool accepted) {
-   if(!accepted) {background=committedBackground;alpha=committedAlpha;outlineColor=committedOutlineColor;outlineThickness=committedOutlineThickness;outlineGlow=committedOutlineGlow;}
+   if(!accepted) {background=committedBackground;alpha=committedAlpha;glowPulse=committedGlowPulse;glowMode=committedGlowMode;outlineColor=committedOutlineColor;outlineThickness=committedOutlineThickness;outlineGlow=committedOutlineGlow;}
    backdropPreview=false;UpdateBackground();
   }
   void PlaceEditor(Window editor) {
@@ -1017,19 +1154,19 @@ namespace GridNest {
   void Settings() {
    BeginBackdropPreview();
    bool accepted=false;
-   var w=new Window {Title="Настройки папки — "+name,Width=500,Height=Math.Min(780,Program.Area(Left,Top).Height-40),Owner=this,ShowInTaskbar=false};
+   var w=new Window {Title="Настройки папки — "+name,Width=500,Height=Math.Min(650,Program.Area(Left,Top).Height-40),Owner=this,ShowInTaskbar=false};
    PlaceEditor(w);
    w.Closed+=(s,e)=>EndBackdropPreview(accepted);
    var layout=new SettingsLayout(w);
-   var appearance=SettingsLayout.Section(layout.Body,"Оформление");
+   var appearance=layout.Page("Вид");
    string chosenTheme=iconTheme;
    AddThemePicker(appearance,value=>chosenTheme=value);
    BackdropEditor(appearance);
    var labelColor=new CheckBox {Content="Тёмный текст названия папки",IsChecked=darkCaption};
    appearance.Children.Add(labelColor);
 
-   var outlineOptions=SettingsLayout.Section(layout.Body,"Обводка");OutlineEditor(outlineOptions);
-   var iconOptions=SettingsLayout.Section(layout.Body,"Значки");
+   var outlineOptions=layout.Page("Обводка");OutlineEditor(outlineOptions);
+   var iconOptions=layout.Page("Значки");
    var scaleLabel=new TextBlock();
    iconOptions.Children.Add(scaleLabel);
    var size=new Slider {Name="IconScale",Minimum=50,Maximum=230,TickFrequency=5,IsSnapToTickEnabled=true,Value=iconSize/56.0*100,ToolTip="Масштаб значков"};
@@ -1041,7 +1178,8 @@ namespace GridNest {
    var motion=new CheckBox {Content="Анимации значков и панелей",IsChecked=animations};
    iconOptions.Children.Add(motion);
 
-   var dimensions=SettingsLayout.Section(layout.Body,"Размер папки");
+   var dimensions=layout.Page("Папка");
+   dimensions.Children.Add(new TextBlock {Text="Размер по сетке",FontWeight=FontWeights.SemiBold,Margin=new Thickness(0,0,0,12)});
    var fields=new Grid();
    fields.ColumnDefinitions.Add(new ColumnDefinition());
    fields.ColumnDefinitions.Add(new ColumnDefinition {Width=new GridLength(16)});
@@ -1050,7 +1188,8 @@ namespace GridNest {
    var width=Field(left,"Столбцы · 1–20",columns.ToString());
    var height=Field(right,"Ряды · 1–20",rows.ToString());
 
-   var behavior=SettingsLayout.Section(layout.Body,"Содержимое и поведение");
+   var behavior=dimensions;
+   behavior.Children.Add(new Separator {Margin=new Thickness(0,8,0,12)});
    var files=new RadioButton {Content="Перемещать файлы в папку",IsChecked=storeFiles,GroupName="SettingsMode"};
    behavior.Children.Add(files);
    behavior.Children.Add(new RadioButton {Content="Создавать ярлыки на файлы",IsChecked=!storeFiles,GroupName="SettingsMode"});
@@ -1102,7 +1241,7 @@ namespace GridNest {
     string copy=Path.Combine(temp,Path.GetFileName(first)); if(File.Exists(first)) { File.Copy(first,copy); errors.AddRange(AddFiles(new[]{copy})); }
     bool drop=errors.Count==0&&File.Exists(source)&&File.Exists(first)&&File.Exists(second)&&File.Exists(third);
     Refresh();UpdateLayout();bool noFakeScroll=order.Count>columns*rows||scroll.ScrollableHeight<.1;
-    SnapSize(257,319); UpdateLayout(); Save(); var x=XElement.Load(config); bool resize=Math.Abs((Width-50)/CellWidth-Math.Round((Width-50)/CellWidth))<.001&&Math.Abs((Height-78)/CellHeight-Math.Round((Height-78)/CellHeight))<.001&&Get(x,"Width",0)==Width&&Get(x,"Rows",0)==rows;
+    SnapSize(257,319); UpdateLayout(); Save(); var x=XElement.Load(config); bool resize=Math.Abs((Width-32)/CellWidth-Math.Round((Width-32)/CellWidth))<.001&&Math.Abs((Height-70)/CellHeight-Math.Round((Height-70)/CellHeight))<.001&&Get(x,"Width",0)==Width&&Get(x,"Rows",0)==rows;
     var scrollBounds=scroll.TransformToAncestor(this).TransformBounds(new Rect(0,0,scroll.ActualWidth,scroll.ActualHeight)); var gripBounds=resizeHandle.TransformToAncestor(this).TransformBounds(new Rect(0,0,resizeHandle.ActualWidth,resizeHandle.ActualHeight)); bool corner=scrollBounds.Bottom<=gripBounds.Top+.01&&resizeHandle.ActualHeight<=12;
     bool oldMotion=animations; animations=false; var testScale=new ScaleTransform(1.3,1.3); var testLift=new TranslateTransform(0,-3); IconMotion(testScale,testLift,1.08,-1); Save(); bool reduced=testScale.ScaleX==1&&testLift.Y==0&&(string)XElement.Load(config).Attribute("Animations")=="false"; animations=oldMotion;
     bool icon=ShellIcon.Get(first,128)!=null;
