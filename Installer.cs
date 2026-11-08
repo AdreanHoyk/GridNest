@@ -1,7 +1,7 @@
 using System;using System.IO;using System.IO.Compression;using System.Diagnostics;using System.Drawing;using System.Linq;using System.Reflection;using System.Threading;using System.Windows.Forms;
 [assembly:AssemblyTitle("GridNest Setup")]
 [assembly:AssemblyProduct("GridNest Setup")]
-[assembly:AssemblyFileVersion("0.12.1.0")]
+[assembly:AssemblyFileVersion("0.13.0.0")]
 class Installer {
  static readonly string[] Files={"GridNest.exe","app.ico","Install.ps1","README.txt","LICENSE.txt"};
  static void Extract(string destination) {
@@ -22,12 +22,12 @@ class Installer {
   foreach(var process in processes)if(!process.WaitForExit(6000))throw new IOException("GridNest ещё работает. Закройте его через меню в трее и повторите установку.");
  }
  [STAThread]static void Main(string[] args) {
-  if(args.Length==2&&args[0]=="--verify") {try {string temp=Path.Combine(Path.GetTempPath(),"GridNest-Installer-Test-"+Guid.NewGuid().ToString("N"));Extract(temp);if(FileVersionInfo.GetVersionInfo(Path.Combine(temp,"GridNest.exe")).FileVersion!="0.12.1.0")throw new Exception("Version mismatch");File.WriteAllText(args[1],"PASS: installer payload extracted; application version 0.12.1; no user folders changed.");Environment.ExitCode=0;}catch(Exception e) {File.WriteAllText(args[1],"FAIL: "+e);Environment.ExitCode=1;}return;}
+  if(args.Length==2&&args[0]=="--verify") {try {string temp=Path.Combine(Path.GetTempPath(),"GridNest-Installer-Test-"+Guid.NewGuid().ToString("N"));Extract(temp);if(FileVersionInfo.GetVersionInfo(Path.Combine(temp,"GridNest.exe")).FileVersion!="0.13.0.0")throw new Exception("Version mismatch");File.WriteAllText(args[1],"PASS: installer payload extracted; application version 0.13.0; no user folders changed.");Environment.ExitCode=0;}catch(Exception e) {File.WriteAllText(args[1],"FAIL: "+e);Environment.ExitCode=1;}return;}
   Application.EnableVisualStyles();Application.SetCompatibleTextRenderingDefault(false);
   string data=Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),"GridNest"),install=Path.Combine(data,".app");
   var form=new Form {Text="Установка GridNest",ClientSize=new Size(500,345),FormBorderStyle=FormBorderStyle.FixedDialog,MaximizeBox=false,StartPosition=FormStartPosition.CenterScreen,BackColor=Color.FromArgb(20,30,42),ForeColor=Color.FromArgb(237,243,248),Font=new Font("Segoe UI",10)};
   using(var iconStream=Assembly.GetExecutingAssembly().GetManifestResourceStream("GridNest.Setup.ico"))using(var icon=new Icon(iconStream))form.Icon=(Icon)icon.Clone();
-  form.Controls.Add(new Label {Text="GridNest 0.12.1",Font=new Font("Segoe UI",23,FontStyle.Bold),AutoSize=true,Location=new Point(25,22)});
+  form.Controls.Add(new Label {Text="GridNest 0.13.0",Font=new Font("Segoe UI",23,FontStyle.Bold),AutoSize=true,Location=new Point(25,22)});
   form.Controls.Add(new Label {Text="Папки и файлы на рабочем столе",AutoSize=true,Location=new Point(27,77)});
   form.Controls.Add(new Label {Text="Установка для текущего пользователя.\nПапки, порядок и настройки сохраняются при обновлении.",AutoSize=true,Location=new Point(27,113)});
   var startup=new CheckBox {Text="Запускать GridNest при входе в Windows",Checked=true,AutoSize=true,Location=new Point(27,178)};form.Controls.Add(startup);
