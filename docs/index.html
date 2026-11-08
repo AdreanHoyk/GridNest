@@ -1,26 +1,137 @@
 <!doctype html>
 <html lang="ru">
 <head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>GridNest — папки и ярлыки на рабочем столе</title>
-<meta name="description" content="Бесплатные полупрозрачные папки для рабочего стола Windows: сетка, ручной порядок значков, свои цвета, поиск и управление из трея.">
-<meta property="og:title" content="GridNest — порядок в своём стиле"><meta property="og:description" content="Ваши ярлыки. Ваша сетка. Ваши цвета. Бесплатно и с открытым кодом."><meta property="og:image" content="https://adreanhoyk.github.io/GridNest/preview.png">
-<link rel="icon" href="icon.svg" type="image/svg+xml"><link rel="stylesheet" href="style.css">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>GridNest — рабочий стол в своём стиле</title>
+  <meta name="description" content="Полупрозрачные папки для ярлыков и файлов Windows. Ровная сетка, свои цвета, обводка и свечение. Бесплатно, с открытым кодом.">
+  <meta property="og:title" content="GridNest — рабочий стол в своём стиле">
+  <meta property="og:description" content="Соберите ярлыки и файлы в удобные папки. Настройте сетку, цвет и свечение.">
+  <meta property="og:image" content="https://adreanhoyk.github.io/GridNest/preview.png?v=0.14.0">
+  <meta property="og:type" content="website">
+  <meta name="theme-color" content="#101722">
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="style.css?v=0.14.0">
 </head>
 <body>
-<header class="nav"><a class="brand" href="#"><img src="icon.svg" alt="" width="36" height="36">GridNest</a><nav aria-label="Навигация"><a href="#features">Возможности</a><a href="#start">Установка</a><a href="https://github.com/AdreanHoyk/GridNest">GitHub ↗</a></nav></header>
+<header class="nav">
+  <a class="brand" href="#"><img src="icon.svg" alt="" width="36" height="36">GridNest</a>
+  <nav aria-label="Навигация">
+    <a href="#features">Возможности</a><a href="#interface">Интерфейс</a><a href="#start">Установка</a>
+    <a href="https://github.com/AdreanHoyk/GridNest">GitHub ↗</a>
+  </nav>
+</header>
 <main>
-<section class="hero"><div class="eyebrow"><span></span> ДЛЯ РАБОЧЕГО СТОЛА WINDOWS</div><h1>Порядок.<br>В своём <em>стиле.</em></h1><p class="lead">Соберите ярлыки в папки, разложите по сетке<br class="wide"> и дайте каждой группе свой цвет.</p><div class="actions"><a class="button primary" href="downloads/GridNest-Setup.exe" download>Скачать GridNest <span>↓</span></a><a class="button secondary" href="https://github.com/AdreanHoyk/GridNest">Посмотреть код ↗</a></div><p class="meta">Версия 0.14.0 <i>·</i> Бесплатно <i>·</i> MIT <i>·</i> Без сторонних плагинов</p><p class="meta"><a href="downloads/GridNest.zip" download>Скачать ZIP без EXE-установщика</a></p><figure class="preview"><img src="preview.png" alt="Три панели GridNest: Работа, Разработка и Сеть с разными цветами подложки" width="1080" height="530"><figcaption>Настоящие панели приложения. На примере — демонстрационные ярлыки Windows.</figcaption></figure></section>
-<section class="story" id="features"><div class="section-label">МЕНЬШЕ ПОИСКОВ. БОЛЬШЕ ПОРЯДКА.</div><div class="intro"><h2>Всё привычное.<br>На своём месте.</h2><p>GridNest работает с ярлыками и самими файлами. Выберите режим папки: хранить оригиналы внутри или создавать ссылки.</p></div><div class="features"><article><b>01 / СЕТКА</b><h3>Ровно столько места,<br>сколько нужно.</h3><p>Меняйте размер целыми ячейками. Папки привязываются к общей сетке, а команда выравнивания расставляет их без перекрытий.</p></article><article><b>02 / ПОРЯДОК</b><h3>Поставили —<br>значит, здесь.</h3><p>Переставляйте значки внутри папки, оставляйте свободные ячейки и переносите между группами. Порядок сохраняется. Масштаб значков меняется ползунком и сочетанием Ctrl + колесо.</p></article><article><b>03 / ПОИСК</b><h3>Найдётся.<br>Во всех папках.</h3><p>Откройте поиск через <kbd>Ctrl</kbd> + <kbd>F</kbd> в активной панели или из трея. Ищите по имени приложения или группы.</p></article></div></section>
-<section class="color-section"><div><div class="section-label">СВОЙ ЦВЕТ ДЛЯ КАЖДОЙ ГРУППЫ</div><h2>Работа — спокойно.<br>Идеи — ярче.</h2><p>Готовые образцы, палитра Windows или точный HEX-код. Цвет и прозрачность сохраняются отдельно для каждой папки.</p><div class="swatches" aria-label="Пример выбора цвета"><button class="swatch active" data-color="#24425C" style="--swatch:#24425C" aria-label="Синий" aria-pressed="true"></button><button class="swatch" data-color="#473657" style="--swatch:#473657" aria-label="Фиолетовый" aria-pressed="false"></button><button class="swatch" data-color="#254B43" style="--swatch:#254B43" aria-label="Зелёный" aria-pressed="false"></button><button class="swatch" data-color="#5B3A3A" style="--swatch:#5B3A3A" aria-label="Красный" aria-pressed="false"></button><label class="custom">Свой цвет <input id="custom-color" type="color" value="#24425c" aria-label="Выбрать свой цвет"></label></div><p class="demo-note">Попробуйте цвет на иллюстрации справа.</p></div><div class="demo"><div class="demo-card" id="demo-card"><div class="app-symbol folder-symbol"></div><div class="app-symbol note-symbol">≡</div><div class="app-symbol code-symbol">⌘</div><div class="app-symbol star-symbol">✦</div><div class="app-symbol wave-symbol">⌁</div><div class="app-symbol cube-symbol">◇</div></div><span>Моя папка</span><code id="hex-label">#24425C</code></div></section>
-<section id="start" class="install"><div class="section-label">ТРИ ШАГА ДО ПОРЯДКА</div><h2>Начните с одной папки.</h2><ol><li><span>1</span><div><h3>Запустите установщик</h3><p>Скачайте GridNest-Setup.exe. Установщик работает для текущего пользователя, без прав администратора.</p></div></li><li><span>2</span><div><h3>Запустите установку</h3><p>Нажмите «Установить / Обновить». ZIP с установкой через PowerShell остаётся альтернативой:</p><div class="command"><code>powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Install.ps1</code><button id="copy" type="button">Копировать</button></div><p class="small">Bypass действует только для этого запуска. Для установки без автозапуска добавьте <code>-NoStartup</code>.</p></div></li><li><span>3</span><div><h3>Добавьте ярлыки</h3><p>Перетащите свои значки в папки. Настройки доступны по правому щелчку. Светлая, тёмная или системная тема — в настройках приложения. Все папки управляются через один значок рядом с часами.</p></div></li></ol></section>
-<section class="details"><h2>Прозрачно.<br>И в работе тоже.</h2><div><p><strong>Локально и без телеметрии.</strong> GridNest не отправляет сетевых запросов, не собирает данные и не обновляется автоматически. Ярлыки и настройки хранятся в вашей папке «Документы».</p><p><strong>Удаление с сохранением.</strong> Убранная группа уходит в локальный архив вместе с содержимым. Приложения и их установки остаются на месте.</p><details><summary>Совместимость и ограничения</summary><p>Проект ориентирован на Windows 11 и использует системный .NET Framework/WPF. Проверен в одной Windows-среде; все версии Windows, DPI и несколько мониторов не сертифицированы. Поддерживается рабочая область основного экрана. Полноэкранные окна и «Показать рабочий стол» могут скрывать панели. Подложка без размытия.</p></details><details><summary>О сборке и исходниках</summary><p>Программа бесплатная, под MIT. Публичный исходный код доступен на GitHub. Сборка пока не имеет цифровой подписи издателя. Инструкции по сборке и проверке находятся в README репозитория.</p></details></div></section>
-<p class="lead">Темы значков «Мягкое стекло» и «Пастель».</p><section class="bottom"><img src="icon.svg" width="64" height="64" alt=""><h2>Ваш рабочий стол.<br>Ваш GridNest.</h2><a class="button primary" href="downloads/GridNest-Setup.exe" download>Скачать для Windows ↓</a></section>
-</main><footer><a class="brand" href="#">GridNest</a><span>Бесплатное приложение с открытым кодом.</span><a href="https://github.com/AdreanHoyk/GridNest">GitHub ↗</a><a href="https://github.com/AdreanHoyk/GridNest/blob/main/LICENSE.txt">MIT</a></footer><p class="credits">GridNest не связан с Microsoft. Значки Windows на демонстрации принадлежат их правообладателям.</p><div class="sr-only" id="status" role="status" aria-live="polite"></div><script src="app.js"></script>
-</body></html>
+  <section class="hero">
+    <h1>Рабочий стол.<br>В своём <em>стиле.</em></h1>
+    <p class="lead">Соберите ярлыки и файлы в полупрозрачные папки.<br class="wide"> Выберите размер, цвет и свечение для каждой группы.</p>
+    <div class="actions">
+      <a class="button primary" href="https://github.com/AdreanHoyk/GridNest/releases/latest/download/GridNest-Setup.exe">Скачать для Windows <span>↓</span></a>
+      <a class="button secondary" href="https://github.com/AdreanHoyk/GridNest/releases/tag/v0.14.0">Что нового в 0.14.0 ↗</a>
+    </div>
+    <p class="meta">Бесплатно <i>·</i> Открытый код <i>·</i> Лицензия MIT</p>
+    <figure class="preview">
+      <img src="preview.png?v=0.14.0" alt="Папки Работа, Разработка и Сеть с ровной сеткой значков, цветными подложками и обводкой" width="1080" height="420">
+      <figcaption>Панели GridNest 0.14.0 с демонстрационными ярлыками Windows.</figcaption>
+    </figure>
+  </section>
 
+  <section class="story" id="features">
+    <div class="intro">
+      <h2>У каждой группы<br>своё место.</h2>
+      <p>Работа, разработка, игры или личные файлы. Создавайте папки под свои задачи и меняйте раскладку, когда нужно.</p>
+    </div>
+    <div class="features">
+      <article><h3>Ровная сетка</h3><p>Меняйте размер целыми ячейками. Отступы вокруг значков одинаковые, а полоса прокрутки не сдвигает сетку.</p></article>
+      <article><h3>Обычные ярлыки и файлы</h3><p>Перетаскивайте значки внутри папок и между ними. Выберите хранение оригиналов или создание ярлыков.</p></article>
+      <article><h3>Цвет и свечение</h3><p>Настройте прозрачность, обводку и её толщину. Свечение может идти внутрь, наружу или в обе стороны и плавно пульсировать.</p></article>
+      <article><h3>Общий стиль</h3><p>Примените оформление к выбранным папкам или всем сразу. Сохраните свои параметры для новых папок.</p></article>
+      <article><h3>Поиск и отмена</h3><p>Находите значки через Ctrl + F. Отменяйте последнее перемещение, изменение размера или массовое оформление через Ctrl + Z.</p></article>
+      <article><h3>Вернуть на рабочий стол</h3><p>Уберите панель с переносом её содержимого на рабочий стол. Совпадающие имена получат номер, оставшиеся после ошибки объекты будут доступны в папке.</p></article>
+    </div>
+  </section>
 
+  <section class="interface" id="interface">
+    <div>
+      <h2>Настройки<br>по делу.</h2>
+      <p>Четыре вкладки для оформления, обводки, значков и поведения папки. Частые команды собраны в коротком меню.</p>
+      <div class="shot-tabs" role="tablist" aria-label="Скриншоты интерфейса">
+        <button id="shot-style" role="tab" aria-selected="true" aria-controls="shot-panel" data-shot="settings.png?v=0.14.0" data-alt="Тёмная тема, вкладка Вид с выбором стиля, цвета и прозрачности" data-caption="Цвет и прозрачность видны на папке ещё до сохранения.">Оформление</button>
+        <button id="shot-outline" role="tab" aria-selected="false" aria-controls="shot-panel" tabindex="-1" data-shot="outline.png?v=0.14.0" data-alt="Настройки обводки с направлением свечения и переключателем пульсации" data-caption="Обводка, направление и пульсация свечения на одной вкладке.">Свечение</button>
+        <button id="shot-menu" role="tab" aria-selected="false" aria-controls="shot-panel" tabindex="-1" data-shot="menu.png?v=0.14.0" data-alt="Компактное контекстное меню с подменю Папка, Оформление и Размещение" data-caption="Команды разделены на папки, оформление и размещение.">Меню</button>
+        <button id="shot-light" role="tab" aria-selected="false" aria-controls="shot-panel" tabindex="-1" data-shot="settings-light.png?v=0.14.0" data-alt="Светлая тема окна настроек GridNest" data-caption="Светлая, тёмная и системная тема для окон и меню.">Светлая тема</button>
+      </div>
+      <p class="shot-caption" id="shot-caption">Цвет и прозрачность видны на папке ещё до сохранения.</p>
+    </div>
+    <figure class="ui-preview" id="shot-panel" role="tabpanel" aria-labelledby="shot-style" tabindex="0">
+      <img id="interface-image" src="settings.png?v=0.14.0" alt="Тёмная тема, вкладка Вид с выбором стиля, цвета и прозрачности" loading="lazy">
+    </figure>
+  </section>
 
+  <section class="color-section">
+    <div>
+      <h2>Попробуйте<br>свой цвет.</h2>
+      <p>Выберите оттенок, прозрачность и направление свечения. В приложении можно отдельно настроить толщину обводки и стиль значков.</p>
+      <div class="swatches" aria-label="Цвет подложки">
+        <button class="swatch active" data-color="#24425C" style="--swatch:#24425C" aria-label="Синий" aria-pressed="true"></button>
+        <button class="swatch" data-color="#473657" style="--swatch:#473657" aria-label="Фиолетовый" aria-pressed="false"></button>
+        <button class="swatch" data-color="#254B43" style="--swatch:#254B43" aria-label="Зелёный" aria-pressed="false"></button>
+        <button class="swatch" data-color="#5B3A3A" style="--swatch:#5B3A3A" aria-label="Терракотовый" aria-pressed="false"></button>
+        <label class="custom">Свой цвет <input id="custom-color" type="color" value="#24425c" aria-label="Свой цвет подложки"></label>
+      </div>
+      <div class="demo-controls">
+        <label for="demo-opacity">Прозрачность <output id="opacity-value">20%</output></label>
+        <input id="demo-opacity" type="range" min="0" max="100" value="20">
+        <label for="demo-glow">Свечение</label>
+        <select id="demo-glow"><option value="inside">Внутрь</option><option value="outside">Наружу</option><option value="both">С обеих сторон</option></select>
+        <label class="pulse-option"><input id="demo-pulse" type="checkbox"> Пульсация</label>
+      </div>
+    </div>
+    <div class="demo">
+      <div class="demo-card" id="demo-card">
+        <div class="app-symbol folder-symbol"></div><div class="app-symbol note-symbol">≡</div>
+        <div class="app-symbol code-symbol">⌘</div><div class="app-symbol star-symbol">✦</div>
+        <div class="app-symbol wave-symbol">⌁</div><div class="app-symbol cube-symbol">◇</div>
+      </div>
+      <span>Моя папка</span><code id="hex-label">#24425C</code>
+      <p class="demo-note">Интерактивная иллюстрация оформления.</p>
+    </div>
+  </section>
 
+  <section id="start" class="install">
+    <h2>Начните с одной папки.</h2>
+    <ol>
+      <li><span>1</span><div><h3>Скачайте установщик</h3><p>Откройте GridNest-Setup.exe из последнего релиза. Установка выполняется для текущего пользователя.</p></div></li>
+      <li><span>2</span><div><h3>Выберите автозапуск</h3><p>Укажите, нужно ли запускать GridNest при входе в Windows, и нажмите «Установить / Обновить».</p></div></li>
+      <li><span>3</span><div><h3>Разложите значки</h3><p>Перетащите ярлыки на панели. Правый щелчок открывает меню папки, значок рядом с часами — общее управление.</p></div></li>
+    </ol>
+    <details><summary>ZIP и установка через PowerShell</summary>
+      <p><a href="https://github.com/AdreanHoyk/GridNest/releases/latest/download/GridNest.zip">Скачайте ZIP</a>, распакуйте его и откройте PowerShell в папке с файлами.</p>
+      <div class="command"><code>powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Install.ps1</code><button id="copy" type="button">Копировать</button></div>
+      <p class="small">Для установки без автозапуска добавьте <code>-NoStartup</code>.</p>
+    </details>
+  </section>
 
-
+  <section class="details">
+    <h2>Перед установкой.</h2>
+    <div>
+      <details><summary>Где хранятся мои файлы?</summary><p>В папке «Документы\GridNest». В режиме файлов оригиналы перемещаются внутрь выбранной папки. В режиме ярлыков создаются ссылки. Готовые ярлыки с рабочего стола перемещаются в обоих режимах.</p></details>
+      <details><summary>Как убрать папку?</summary><p>В меню выберите «Папка → Убрать папку». Можно сохранить её содержимое в архиве GridNest или перенести на рабочий стол. Если часть объектов не удалось перенести, панель останется открытой с ними.</p></details>
+      <details><summary>Можно отключить свечение и анимации?</summary><p>Да. Значение 0 отключает свечение или обводку. Пульсация включается отдельно и учитывает настройку анимаций папки.</p></details>
+      <details><summary>Что нужно для работы?</summary><p>Приложение разрабатывается и проверяется на Windows 11 с системным .NET Framework и WPF. Разный масштаб экранов и работа с несколькими мониторами требуют отдельной проверки. Права администратора и сторонние плагины для установки не нужны.</p></details>
+      <details><summary>Есть ли телеметрия и автоматические обновления?</summary><p>GridNest работает локально и не отправляет сетевые запросы. Обновления устанавливаются вручную из GitHub Releases. Установщик и приложение пока не подписаны цифровым сертификатом.</p></details>
+    </div>
+  </section>
+  <section class="bottom">
+    <img src="icon.svg" width="64" height="64" alt="">
+    <h2>Соберите свой GridNest.</h2>
+    <a class="button primary" href="https://github.com/AdreanHoyk/GridNest/releases/latest/download/GridNest-Setup.exe">Скачать установщик ↓</a>
+    <p><a href="https://github.com/AdreanHoyk/GridNest/releases">Все версии и изменения ↗</a></p>
+  </section>
+</main>
+<footer><a class="brand" href="#">GridNest</a><span>Бесплатно, с открытым кодом.</span><a href="https://github.com/AdreanHoyk/GridNest">GitHub ↗</a><a href="https://github.com/AdreanHoyk/GridNest/blob/main/LICENSE.txt">MIT</a></footer>
+<p class="credits">На скриншотах показаны демонстрационные ярлыки. Значки Windows принадлежат их правообладателям. GridNest не связан с Microsoft.</p>
+<div class="sr-only" id="status" role="status" aria-live="polite"></div>
+<script src="app.js?v=0.14.0"></script>
+</body>
+</html>
