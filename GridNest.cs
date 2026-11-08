@@ -19,8 +19,8 @@ using System.Reflection;
 [assembly: AssemblyTitle("GridNest")]
 [assembly: AssemblyProduct("GridNest")]
 [assembly: AssemblyDescription("Desktop folder panels with a snap-to-grid layout")]
-[assembly: AssemblyVersion("0.15.1.0")]
-[assembly: AssemblyFileVersion("0.15.1.0")]
+[assembly: AssemblyVersion("0.15.2.0")]
+[assembly: AssemblyFileVersion("0.15.2.0")]
 
 namespace GridNest {
  public sealed class SettingsLayout {
@@ -459,7 +459,7 @@ namespace GridNest {
   public void UpdateHandles() {
    foreach(var marker in new[]{moveMarker,resizeHandle}) {
     marker.Visibility=Program.Locked?Visibility.Hidden:Visibility.Visible;
-    Fade(marker,IsMouseOver ? 1 : (marker==resizeHandle ? 0.78 : 0),100);
+    Fade(marker,IsMouseOver ? 1 : 0,100);
    }
   }
   void PaintLabel() {
@@ -497,12 +497,12 @@ namespace GridNest {
    scroll=new ScrollViewer { Content=icons, HorizontalScrollBarVisibility=ScrollBarVisibility.Disabled, VerticalScrollBarVisibility=ScrollBarVisibility.Auto, PanningMode=PanningMode.VerticalOnly,Margin=new Thickness(16),ClipToBounds=false };
    scroll.Template=(ControlTemplate)System.Windows.Markup.XamlReader.Parse(@"<ControlTemplate xmlns='http://schemas.microsoft.com/winfx/2006/xaml/presentation' xmlns:p='clr-namespace:System.Windows.Controls.Primitives;assembly=PresentationFramework' xmlns:x='http://schemas.microsoft.com/winfx/2006/xaml' TargetType='ScrollViewer'><Grid><ScrollContentPresenter x:Name='PART_ScrollContentPresenter' Content='{TemplateBinding Content}' ContentTemplate='{TemplateBinding ContentTemplate}' CanContentScroll='{TemplateBinding CanContentScroll}'/><p:ScrollBar x:Name='PART_VerticalScrollBar' Width='8' Margin='0,0,-8,0' HorizontalAlignment='Right' Orientation='Vertical' Maximum='{TemplateBinding ScrollableHeight}' ViewportSize='{TemplateBinding ViewportHeight}' Value='{Binding VerticalOffset,RelativeSource={RelativeSource TemplatedParent},Mode=OneWay}' Visibility='{TemplateBinding ComputedVerticalScrollBarVisibility}'/></Grid></ControlTemplate>");
    content.Children.Add(scroll);
-   caption=new TextBlock { Text=name, FontFamily=new FontFamily("Segoe UI"), FontSize=19, Foreground=Brushes.White, Margin=new Thickness(36,0,36,0),TextTrimming=TextTrimming.CharacterEllipsis,TextAlignment=TextAlignment.Center,HorizontalAlignment=HorizontalAlignment.Stretch, VerticalAlignment=VerticalAlignment.Center };
+   caption=new TextBlock { Text=name, FontFamily=new FontFamily("Segoe UI"), FontSize=19, Foreground=Brushes.White, TextAlignment=TextAlignment.Center,HorizontalAlignment=HorizontalAlignment.Center, VerticalAlignment=VerticalAlignment.Center };
    PaintLabel();
    Grid.SetRow(caption,1); frame.Children.Add(caption);
    // An explicit resize handle works with transparent borderless windows.
-   System.Windows.Controls.Primitives.Thumb grip=new System.Windows.Controls.Primitives.Thumb { Width=32, Height=32, HorizontalAlignment=HorizontalAlignment.Right, VerticalAlignment=VerticalAlignment.Center, Margin=new Thickness(0,0,2,0), Cursor=Cursors.SizeNWSE, Opacity=.78, ToolTip="Потяните, чтобы изменить размер папки" };
-   resizeHandle=grip;AttachTouchResize(grip);grip.Template=GripTemplate();Grid.SetRow(grip,1);frame.Children.Add(grip);
+   System.Windows.Controls.Primitives.Thumb grip=new System.Windows.Controls.Primitives.Thumb { Width=36, Height=16, HorizontalAlignment=HorizontalAlignment.Right, VerticalAlignment=VerticalAlignment.Bottom, Margin=new Thickness(0,0,1,5), Cursor=Cursors.SizeNWSE, Opacity=0, ToolTip="Потяните, чтобы изменить размер папки" };
+   resizeHandle=grip;AttachTouchResize(grip);grip.Template=GripTemplate();content.Children.Add(grip);
    var moveDots=new Canvas {Width=12,Height=10,HorizontalAlignment=HorizontalAlignment.Center,VerticalAlignment=VerticalAlignment.Center};
    for(int y=0;y<3;y++)for(int x=0;x<2;x++) {var dot=new System.Windows.Shapes.Ellipse {Width=2,Height=2};dot.SetResourceReference(System.Windows.Shapes.Shape.FillProperty,"PanelHandle");Canvas.SetLeft(dot,3+x*4);Canvas.SetTop(dot,1+y*3);moveDots.Children.Add(dot);}
    var moveHandle=new Border {Child=moveDots,Width=48,Height=12,Background=Brushes.Transparent,HorizontalAlignment=HorizontalAlignment.Center,VerticalAlignment=VerticalAlignment.Bottom,Margin=new Thickness(0,0,0,2),Cursor=Cursors.SizeAll,ToolTip="Перетащить папку"};
@@ -568,7 +568,7 @@ namespace GridNest {
    Closed+=(s,e)=> {if(haloWindow!=null)haloWindow.Close();Save();watcher.Dispose();debounce.Stop();};
   }
   static ControlTemplate GripTemplate() {
-   return (ControlTemplate)System.Windows.Markup.XamlReader.Parse(@"<ControlTemplate xmlns='http://schemas.microsoft.com/winfx/2006/xaml/presentation' xmlns:x='http://schemas.microsoft.com/winfx/2006/xaml' TargetType='Thumb'><Grid Background='Transparent'><Border x:Name='Badge' Width='26' Height='26' CornerRadius='13' Background='#EB14212C' BorderBrush='#88FFFFFF' BorderThickness='1' HorizontalAlignment='Center' VerticalAlignment='Center'><Path Data='M 7,17 L 17,7 M 12,17 L 17,12' Stroke='White' StrokeThickness='1.8' StrokeStartLineCap='Round' StrokeEndLineCap='Round'/></Border></Grid><ControlTemplate.Triggers><Trigger Property='IsMouseOver' Value='True'><Setter TargetName='Badge' Property='Background' Value='#31576B'/></Trigger><Trigger Property='IsDragging' Value='True'><Setter TargetName='Badge' Property='Background' Value='#19756C'/></Trigger></ControlTemplate.Triggers></ControlTemplate>");
+   return (ControlTemplate)System.Windows.Markup.XamlReader.Parse(@"<ControlTemplate xmlns='http://schemas.microsoft.com/winfx/2006/xaml/presentation' xmlns:x='http://schemas.microsoft.com/winfx/2006/xaml' TargetType='Thumb'><Grid Background='Transparent'><Canvas Width='20' Height='12' HorizontalAlignment='Center' VerticalAlignment='Center' IsHitTestVisible='False'><Path Data='M 3,11 L 15,0 M 9,11 L 16,5' Stroke='#DD101820' StrokeThickness='4' StrokeStartLineCap='Round' StrokeEndLineCap='Round'/><Path x:Name='Glyph' Data='M 3,11 L 15,0 M 9,11 L 16,5' Stroke='White' StrokeThickness='1.8' StrokeStartLineCap='Round' StrokeEndLineCap='Round'/></Canvas></Grid><ControlTemplate.Triggers><Trigger Property='IsDragging' Value='True'><Setter TargetName='Glyph' Property='Stroke' Value='#8AE5D5'/></Trigger></ControlTemplate.Triggers></ControlTemplate>");
   }
   static MenuItem Add(ItemsControl m,string text,Action action) { var item=new MenuItem { Header=text }; item.Click+=(s,e)=>action(); m.Items.Add(item);return item; }
   void Load() {
@@ -590,7 +590,12 @@ namespace GridNest {
    if(Program.LayoutReady&&!Program.FindPlacement(this,Left,Top,width,height,relocate,out position))return false;
    columns=nextColumns;rows=nextRows;
    snapping=true;
-   try { Width=width;Height=height;if(Program.LayoutReady) {Left=position.X;Top=position.Y;} if(icons!=null)icons.Width=columns*CellWidth; }
+   try { Width=width;Height=height;if(Program.LayoutReady) {Left=position.X;Top=position.Y;} if(icons!=null)icons.Width=columns*CellWidth;
+    if(moveMarker!=null) {
+     moveMarker.Width=Math.Min(48,Math.Max(12,Width-56));
+     moveMarker.HorizontalAlignment=Width<140?HorizontalAlignment.Left:HorizontalAlignment.Center;
+     moveMarker.Margin=new Thickness(Width<140?4:0,0,0,2);
+    } }
    finally { snapping=false; }
    return true;
   }
@@ -907,7 +912,7 @@ namespace GridNest {
    surface.PreviewTouchDown+=(s,e)=> {
     if(Program.Locked||device!=null)return;
     device=e.TouchDevice;start=e.GetTouchPoint(this).Position;width=Width;height=Height;restore=CaptureLayout();
-    surface.CaptureTouch(device);e.Handled=true;
+    surface.CaptureTouch(device);Fade(surface,1,100);e.Handled=true;
    };
    surface.PreviewTouchMove+=(s,e)=> {
     if(device!=e.TouchDevice)return;
@@ -916,9 +921,9 @@ namespace GridNest {
    surface.PreviewTouchUp+=(s,e)=> {
     if(device!=e.TouchDevice)return;
     var contact=device;device=null;surface.ReleaseTouchCapture(contact);AlignPosition();Save();
-    if(Width!=width||Height!=height)Program.Remember(restore);e.Handled=true;
+    if(Width!=width||Height!=height)Program.Remember(restore);UpdateHandles();e.Handled=true;
    };
-   surface.LostTouchCapture+=(s,e)=> {if(device==e.TouchDevice) {device=null;AlignPosition();Save();}};
+   surface.LostTouchCapture+=(s,e)=> {if(device==e.TouchDevice) {device=null;AlignPosition();Save();UpdateHandles();}};
   }
 
   void DropFiles(object sender,DragEventArgs e) {
@@ -1195,6 +1200,7 @@ namespace GridNest {
    parent.Children.Add(new TextBlock {Text="Цвет обводки",Margin=new Thickness(0,0,0,6)});
    var input=new TextBox {Name="OutlineColor",Text=ColorHex(outlineColor),ToolTip="Цвет в формате #RRGGBB"};
    parent.Children.Add(input);
+   AddColorPresets(parent,input);
    var error=new TextBlock {Text="Введите цвет в формате #RRGGBB",Foreground=Brushes.Salmon,Visibility=Visibility.Collapsed};
    parent.Children.Add(error);
    input.TextChanged+=(s,e)=> {
@@ -1463,15 +1469,19 @@ namespace GridNest {
    editor.Left=Math.Max(area.Left,Math.Min(area.Right-editor.Width,editor.Left));
    editor.Top=Math.Max(area.Top,Math.Min(area.Bottom-editor.Height,Top));
   }
+  static void AddColorPresets(StackPanel parent,TextBox input) {
+   var swatches=new WrapPanel {Name=input.Name+"Presets",Margin=new Thickness(0,8,0,8)};parent.Children.Add(swatches);
+   foreach(var hex in new[]{"#2C2E37","#24425C","#254B43","#473657","#B8E1E4","#F0D9EB"}) {
+    var button=new Button {Background=new SolidColorBrush(ParseColor(hex)),Width=32,Height=28,Margin=new Thickness(0,0,6,0),ToolTip=hex};
+    System.Windows.Automation.AutomationProperties.SetName(button,"Выбрать цвет "+hex);
+    button.Click+=(s,e)=>input.Text=hex;swatches.Children.Add(button);
+   }
+  }
   void BackdropEditor(StackPanel parent) {
    parent.Children.Add(new TextBlock {Text="Цвет подложки",Margin=new Thickness(0,12,0,4)});
    var input=new TextBox {Name="BackdropColor",Text=ColorHex(background),ToolTip="Цвет в формате #RRGGBB"};
    parent.Children.Add(input);
-   var swatches=new WrapPanel {Margin=new Thickness(0,8,0,8)};parent.Children.Add(swatches);
-   foreach(var hex in new[]{"#2C2E37","#24425C","#254B43","#473657","#B8E1E4","#F0D9EB"}) {
-    var button=new Button {Background=new SolidColorBrush(ParseColor(hex)),Width=32,Height=28,Margin=new Thickness(0,0,6,0),ToolTip=hex};
-    button.Click+=(s,e)=>input.Text=hex;swatches.Children.Add(button);
-   }
+   AddColorPresets(parent,input);
    var error=new TextBlock {Text="Введите #RRGGBB",Foreground=Brushes.Salmon,Visibility=Visibility.Collapsed};
    parent.Children.Add(error);
    input.TextChanged+=(s,e)=> {
@@ -1582,7 +1592,7 @@ namespace GridNest {
     bool drop=errors.Count==0&&File.Exists(source)&&File.Exists(first)&&File.Exists(second)&&File.Exists(third);
     Refresh();UpdateLayout();bool noFakeScroll=order.Count>columns*rows||scroll.ScrollableHeight<.1;
     SnapSize(257,319); UpdateLayout(); Save(); var x=XElement.Load(config); bool resize=Math.Abs((Width-32)/CellWidth-Math.Round((Width-32)/CellWidth))<.001&&Math.Abs((Height-70)/CellHeight-Math.Round((Height-70)/CellHeight))<.001&&Get(x,"Width",0)==Width&&Get(x,"Rows",0)==rows;
-    var scrollBounds=scroll.TransformToAncestor(this).TransformBounds(new Rect(0,0,scroll.ActualWidth,scroll.ActualHeight)); var gripBounds=resizeHandle.TransformToAncestor(this).TransformBounds(new Rect(0,0,resizeHandle.ActualWidth,resizeHandle.ActualHeight)); bool corner=scrollBounds.Bottom<=gripBounds.Top+.01&&resizeHandle.ActualHeight<=32;
+    var scrollBounds=scroll.TransformToAncestor(this).TransformBounds(new Rect(0,0,scroll.ActualWidth,scroll.ActualHeight)); var gripBounds=resizeHandle.TransformToAncestor(this).TransformBounds(new Rect(0,0,resizeHandle.ActualWidth,resizeHandle.ActualHeight)); bool corner=scrollBounds.Bottom-8<=gripBounds.Top+.01&&resizeHandle.ActualHeight<=32;
     bool oldMotion=animations; animations=false; var testScale=new ScaleTransform(1.3,1.3); var testLift=new TranslateTransform(0,-3); IconMotion(testScale,testLift,1.08,-1); Save(); bool reduced=testScale.ScaleX==1&&testLift.Y==0&&(string)XElement.Load(config).Attribute("Animations")=="false"; animations=oldMotion;
     bool icon=ShellIcon.Get(first,128)!=null;
     string renamed=RenamePath(third,id+"-renamed"); bool rename=File.Exists(renamed)&&!File.Exists(third)&&renamed.EndsWith(".lnk"); File.Move(renamed,third);
