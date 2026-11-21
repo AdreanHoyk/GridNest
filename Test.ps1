@@ -12,3 +12,4 @@ $text=Get-Content -LiteralPath $report.FullName -Raw
 if($text -match 'FAIL' -or $text -notmatch 'color/persist/validation=PASS' -or $text -notmatch 'FEATURES:') { $text; throw 'Tests failed' }
 $text
 Write-Output "PASS. Isolated test data retained: $testRoot"
+& (Join-Path $PSScriptRoot 'Test-Settings.ps1')

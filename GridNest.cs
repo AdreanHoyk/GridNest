@@ -19,8 +19,8 @@ using System.Reflection;
 [assembly: AssemblyTitle("GridNest")]
 [assembly: AssemblyProduct("GridNest")]
 [assembly: AssemblyDescription("Desktop folder panels with a snap-to-grid layout")]
-[assembly: AssemblyVersion("0.15.4.0")]
-[assembly: AssemblyFileVersion("0.15.4.0")]
+[assembly: AssemblyVersion("0.15.5.0")]
+[assembly: AssemblyFileVersion("0.15.5.0")]
 
 namespace GridNest {
  public sealed class SettingsLayout {
@@ -218,6 +218,14 @@ namespace GridNest {
   public const int PanelGrid=16;
   public static int MinPanelGap=16;
   public static int MinVerticalGap=8;
+  static readonly HashSet<string> settingsErrors=new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+  public static void ReportSettingsError(string path,Exception error) {
+   try {File.AppendAllText(Path.Combine(Home,"settings-errors.log"),DateTime.Now.ToString("s")+" | "+path+" | "+error.Message+Environment.NewLine);}catch{}
+   if(settingsErrors.Add(path)&&tray!=null)ShowSettingsWarning();
+  }
+  static void ShowSettingsWarning() {
+   if(tray!=null)tray.ShowBalloonTip(8000,"GridNest — настройки","Не удалось прочитать или сохранить настройки папки. Существующие файлы сохранены. Подробности: settings-errors.log.",Forms.ToolTipIcon.Warning);
+  }
   public static bool Locked;
   static Action undo;
   public static void Remember(Action action) { undo=action; }
@@ -294,6 +302,7 @@ namespace GridNest {
    add("Открыть архив папок",OpenArchive);
    menu.Items.Add(new Forms.ToolStripSeparator()); add("Выход",()=>Application.Current.Shutdown());
    tray.ContextMenuStrip=menu; PaintTray(); tray.DoubleClick+=(s,e)=>Application.Current.Dispatcher.BeginInvoke(new Action(ShowPanels)); tray.Visible=true;
+   if(settingsErrors.Count>0)ShowSettingsWarning();
   }
   static bool LightTheme {
    get { if(ThemeMode!="System")return ThemeMode=="Light"; try { return Convert.ToInt32(Microsoft.Win32.Registry.GetValue(@"HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize","AppsUseLightTheme",1))!=0; } catch { return false; } }
@@ -493,6 +502,7 @@ namespace GridNest {
   Dictionary<string,ImageSource> cache=new Dictionary<string,ImageSource>(StringComparer.OrdinalIgnoreCase);
   int contentGeneration;
   bool panelClosed;
+  bool configWritable=true;
   public PanelWindow(string n,int index) {
    name=n; folder=Path.Combine(Program.Data,n); config=Path.Combine(Program.Home,n+".xml"); Directory.CreateDirectory(folder);
    Title="GridNest — "+name; Width=266; Height=264; Left=30+index*290; Top=90;
@@ -595,13 +605,23 @@ namespace GridNest {
   }
   static MenuItem Add(ItemsControl m,string text,Action action) { var item=new MenuItem { Header=text }; item.Click+=(s,e)=>action(); m.Items.Add(item);return item; }
   void Load() {
-   try { var x=XElement.Load(config); Width=Get(x,"Width",Width); Height=Get(x,"Height",Height); Left=Get(x,"Left",Left); Top=Get(x,"Top",Top); iconSize=(int)Math.Max(28,Math.Min(128,Get(x,"IconSize",64))); alpha=Math.Max(0,Math.Min(1,Get(x,"Opacity",.84))); darkCaption=(bool?)x.Attribute("DarkCaption")??false; labels=(string)x.Attribute("Labels")=="true"; Topmost=(string)x.Attribute("Topmost")=="true"; columns=(int)Get(x,"Columns",Math.Round((Width-32)/CellWidth)); rows=(int)Get(x,"Rows",Math.Round((Height-66)/CellHeight)); } catch {}
-   try {var x=XElement.Load(config);iconTheme=ValidIconTheme((string)x.Attribute("IconTheme"));}catch{}
-   try { var x=XElement.Load(config); if(x.Attribute("Background")!=null)background=ParseColor((string)x.Attribute("Background")); } catch {}
-   try {var x=XElement.Load(config);glowPulse=(bool?)x.Attribute("GlowPulse")??false;glowMode=ValidGlowMode((string)x.Attribute("GlowMode"));outlineColor=ParseColor((string)x.Attribute("OutlineColor")??"#8AE5D5");outlineThickness=Math.Max(0,Math.Min(8,Get(x,"OutlineThickness",0)));outlineGlow=Math.Max(0,Math.Min(100,Get(x,"OutlineGlow",0)));}catch{}
-   try { animations=(string)XElement.Load(config).Attribute("Animations")!="false"; } catch {}
-   try {var x=XElement.Load(config);Point restored;if(x.Attribute("MonitorX")!=null&&x.Attribute("MonitorY")!=null&&MonitorInfo.Restore(Program.Monitors(),(string)x.Attribute("MonitorId"),Get(x,"MonitorX",0),Get(x,"MonitorY",0),out restored)){Left=restored.X;Top=restored.Y;}}catch{}
-   try { storeFiles=(string)XElement.Load(config).Attribute("Mode")!="Shortcuts"; } catch {}
+   configWritable=true;
+   XElement x;
+   try {x=PanelSettingsFile.Load(config);if(x==null)return;}
+   catch(Exception ex) {configWritable=false;Program.ReportSettingsError(config,ex);return;}
+   Width=Get(x,"Width",Width);Height=Get(x,"Height",Height);Left=Get(x,"Left",Left);Top=Get(x,"Top",Top);
+   iconSize=(int)Math.Max(28,Math.Min(128,Get(x,"IconSize",64)));alpha=Math.Max(0,Math.Min(1,Get(x,"Opacity",.84)));
+   bool value;darkCaption=bool.TryParse((string)x.Attribute("DarkCaption"),out value)&&value;
+   labels=(string)x.Attribute("Labels")=="true";Topmost=(string)x.Attribute("Topmost")=="true";
+   columns=(int)Get(x,"Columns",Math.Round((Width-32)/CellWidth));rows=(int)Get(x,"Rows",Math.Round((Height-70)/CellHeight));
+   iconTheme=ValidIconTheme((string)x.Attribute("IconTheme"));
+   try {if(x.Attribute("Background")!=null)background=ParseColor((string)x.Attribute("Background"));}catch(FormatException){}
+   glowPulse=bool.TryParse((string)x.Attribute("GlowPulse"),out value)&&value;glowMode=ValidGlowMode((string)x.Attribute("GlowMode"));
+   try {outlineColor=ParseColor((string)x.Attribute("OutlineColor")??"#8AE5D5");}catch(FormatException){}
+   outlineThickness=Math.Max(0,Math.Min(8,Get(x,"OutlineThickness",0)));outlineGlow=Math.Max(0,Math.Min(100,Get(x,"OutlineGlow",0)));
+   animations=(string)x.Attribute("Animations")!="false";
+   Point restored;if(x.Attribute("MonitorX")!=null&&x.Attribute("MonitorY")!=null&&MonitorInfo.Restore(Program.Monitors(),(string)x.Attribute("MonitorId"),Get(x,"MonitorX",double.NaN),Get(x,"MonitorY",double.NaN),out restored)){Left=restored.X;Top=restored.Y;}
+   storeFiles=(string)x.Attribute("Mode")!="Shortcuts";
    Width=Math.Max(MinWidth,Width); Height=Math.Max(MinHeight,Height);
   }
   static double Get(XElement e,string key,double d) { double v; return double.TryParse((string)e.Attribute(key),System.Globalization.NumberStyles.Float,System.Globalization.CultureInfo.InvariantCulture,out v)&&!double.IsNaN(v)&&!double.IsInfinity(v)?v:d; }
@@ -681,8 +701,8 @@ namespace GridNest {
 
   }
   public void Save() {
-   if(!loaded||retired)return;
-   try { var monitor=Program.MonitorAt(Left+Width/2,Top+Height/2);new XElement("Panel",new XAttribute("MonitorId",monitor.Id),new XAttribute("MonitorX",Left-monitor.WorkArea.Left),new XAttribute("MonitorY",Top-monitor.WorkArea.Top),new XAttribute("Mode",storeFiles?"Files":"Shortcuts"),new XAttribute("Columns",columns),new XAttribute("Rows",rows),new XAttribute("Width",Width),new XAttribute("Height",Height),new XAttribute("Left",Left),new XAttribute("Top",Top),new XAttribute("IconTheme",iconTheme),new XAttribute("IconSize",iconSize),new XAttribute("Opacity",backdropPreview?committedAlpha:alpha),new XAttribute("GlowPulse",backdropPreview?committedGlowPulse:glowPulse),new XAttribute("GlowMode",backdropPreview?committedGlowMode:glowMode),new XAttribute("OutlineColor",ColorHex(backdropPreview?committedOutlineColor:outlineColor)),new XAttribute("OutlineThickness",backdropPreview?committedOutlineThickness:outlineThickness),new XAttribute("OutlineGlow",backdropPreview?committedOutlineGlow:outlineGlow),new XAttribute("Background",ColorHex(backdropPreview?committedBackground:background)),new XAttribute("Animations",animations?"true":"false"),new XAttribute("DarkCaption",darkCaption),new XAttribute("Labels",labels?"true":"false"),new XAttribute("Topmost",Topmost?"true":"false")).Save(config); } catch {}
+   if(!loaded||retired||!configWritable)return;
+   try { var monitor=Program.MonitorAt(Left+Width/2,Top+Height/2);PanelSettingsFile.Save(new XElement("Panel",new XAttribute("MonitorId",monitor.Id),new XAttribute("MonitorX",Left-monitor.WorkArea.Left),new XAttribute("MonitorY",Top-monitor.WorkArea.Top),new XAttribute("Mode",storeFiles?"Files":"Shortcuts"),new XAttribute("Columns",columns),new XAttribute("Rows",rows),new XAttribute("Width",Width),new XAttribute("Height",Height),new XAttribute("Left",Left),new XAttribute("Top",Top),new XAttribute("IconTheme",iconTheme),new XAttribute("IconSize",iconSize),new XAttribute("Opacity",backdropPreview?committedAlpha:alpha),new XAttribute("GlowPulse",backdropPreview?committedGlowPulse:glowPulse),new XAttribute("GlowMode",backdropPreview?committedGlowMode:glowMode),new XAttribute("OutlineColor",ColorHex(backdropPreview?committedOutlineColor:outlineColor)),new XAttribute("OutlineThickness",backdropPreview?committedOutlineThickness:outlineThickness),new XAttribute("OutlineGlow",backdropPreview?committedOutlineGlow:outlineGlow),new XAttribute("Background",ColorHex(backdropPreview?committedBackground:background)),new XAttribute("Animations",animations?"true":"false"),new XAttribute("DarkCaption",darkCaption),new XAttribute("Labels",labels?"true":"false"),new XAttribute("Topmost",Topmost?"true":"false")),config); } catch(Exception ex) {Program.ReportSettingsError(config,ex);}
   }
   bool Motion { get { return animations&&SystemParameters.ClientAreaAnimation; } }
   void Fade(UIElement target,double opacity,int ms) {
@@ -1397,7 +1417,7 @@ namespace GridNest {
    RedrawStyle();return layoutFits;
   }
   void LoadDefaultStyle() {
-   if(File.Exists(config))return;
+   if(!configWritable||File.Exists(config)||File.Exists(config+".bak"))return;
    try {
     var style=FolderStyle.Read(XElement.Load(Path.Combine(Program.Home,"default-style.xml")));
     glowPulse=style.GlowPulse;glowMode=style.GlowMode;outlineColor=style.OutlineColor;outlineThickness=style.OutlineThickness;outlineGlow=style.OutlineGlow;
@@ -1663,6 +1683,37 @@ namespace GridNest {
     return name+": file-to-lnk, duplicate names, copy existing lnk, preserve source="+(drop?"PASS":"FAIL "+string.Join(";",errors))+"; grid/persist="+(resize?"PASS":"FAIL")+"; shortcut icon="+(icon?"PASS":"FAIL")+"; rename/keep-extension="+(rename?"PASS":"FAIL")+"; folder rename="+(folderRename?"PASS":"FAIL")+"; rename conflict="+(conflict?"PASS":"FAIL")+"; inter-folder move="+(moved?"PASS":"FAIL")+"; manual order/persist="+(manual?"PASS":"FAIL")+"; color/persist/validation="+(color?"PASS":"FAIL")+"; resize-corner-clear="+(corner?"PASS":"FAIL")+"; animation-disable/persist="+(reduced?"PASS":"FAIL")+"; original-files-move/conflicts="+(originals&&recursive?"PASS":"FAIL")+"; icon-scale/persist="+(scaling?"PASS":"FAIL")+"; themed-scroll="+(themed?"PASS":"FAIL")+"; no-empty-grid-scroll="+(noFakeScroll?"PASS":"FAIL");
    } catch(Exception e) { return name+": FAIL "+e.ToString(); }
    finally { storeFiles=oldMode; iconSize=oldSize; SetGrid(oldColumns,oldRows); background=oldBackground; UpdateBackground(); Save(); foreach(string p in new[]{first,second,third,dataTarget,dataTarget2}) if(File.Exists(p))File.Delete(p); if(Directory.Exists(directoryTarget)&&Path.GetFullPath(directoryTarget).StartsWith(Path.GetFullPath(folder)+Path.DirectorySeparatorChar,StringComparison.OrdinalIgnoreCase)&&Path.GetFileName(directoryTarget)==id+"-folder")Directory.Delete(directoryTarget,true); if(Directory.Exists(temp))Directory.Delete(temp,true); order=oldOrder; SaveOrder(); cache.Clear(); Refresh(); UpdateLayout(); }
+  }
+ }
+ public static class PanelSettingsFile {
+  static XElement Read(string path) {
+   var xml=XElement.Load(path);
+   if(xml.Name!="Panel")throw new InvalidDataException("Неверный формат настроек папки.");
+   return xml;
+  }
+  public static XElement Load(string path) {
+   Exception failure=null;
+   for(int attempt=0;attempt<3;attempt++) {
+    try {return Read(path);}
+    catch(FileNotFoundException) {break;}
+    catch(DirectoryNotFoundException) {break;}
+    catch(Exception ex) {failure=ex;if(attempt<2)System.Threading.Thread.Sleep(40);}
+   }
+   try {return Read(path+".bak");}
+   catch(FileNotFoundException) {if(failure==null)return null;}
+   catch(DirectoryNotFoundException) {if(failure==null)return null;}
+   catch(Exception ex) {if(failure==null)failure=ex;}
+   throw new IOException("Не удалось загрузить настройки или резервную копию. Исходные файлы не перезаписаны.",failure);
+  }
+  public static void Save(XElement xml,string path) {
+   string temporary=path+"."+Guid.NewGuid().ToString("N")+".tmp";
+   try {
+    using(var stream=new FileStream(temporary,FileMode.CreateNew,FileAccess.Write,FileShare.None,4096,FileOptions.WriteThrough)) {xml.Save(stream);stream.Flush(true);}
+    if(File.Exists(path)) {
+     bool valid=false;try {Read(path);valid=true;}catch{}
+     File.Replace(temporary,path,valid?path+".bak":null,true);
+    } else File.Move(temporary,path);
+   } finally {try {if(File.Exists(temporary))File.Delete(temporary);}catch{}}
   }
  }
  public sealed class MonitorInfo {
